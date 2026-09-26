@@ -1,0 +1,15 @@
+.env
+venv/
+__pycache__/
+*.pyc
+# runtime data (keep folders via .gitkeep)
+data/*.db
+data/uploads/*
+!data/uploads/.gitkeep
+data/chroma_db/*
+!data/chroma_db/.gitkeep
+.pytest_cache/
+
+# evaluation: regenerate with python -m evaluation.make_dataset / run_eval
+evaluation/dataset/
+evaluation/results/work/
