@@ -229,3 +229,35 @@ def test_sources_cite_page_and_lines(client, pdf_file, fake_llm) -> None:
     answer = client.post("/ask", json=body).json()
     [source] = client.get(f"/answer/{answer['answer_id']}/sources").json()
     assert (source["page"], source["first_line"], source["last_line"]) == (1, 1, 3)
+
+
+# --- a large typed document must not crowd out the relevant, less legible one ----------------
+
+
+def test_best_match_in_a_poorly_read_document_is_not_crowded_out(fake_embeddings, chroma) -> None:
+    """The failure seen with real notes: five loosely related typed passages (confidence 1.0)
+    outscored the handwritten page that matched the question best (confidence 0.4)."""
+    # Similarities (fake embeddings): notes 0.775, each typed passage 0.722, so all are within
+    # the relevance margin, yet every typed passage has the higher combined_score (0.81 vs 0.66).
+    question = "markov models advantages effective easy implement"
+    typed = [f"markov models advantages effective easy report chapter{c} charts" for c in "abdefgh"]
+    _store_with_conf("typed", typed, 1.0)
+    _store_with_conf("notes", ["markov models advantages effective easy implement pocono economy materials workers"], 0.4)
+
+    hits = retrieval.retrieve(Query(query_id="q", question_text=question, user_id="u"), top_k=5)
+
+    assert "notes:0" in [chunk.chunk_id for chunk, _ in hits]
+    scores = [r.combined_score for _, r in hits]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_one_relevant_document_still_fills_every_slot(fake_embeddings, chroma) -> None:
+    _store_with_conf("typed", [f"data visualization chart type {n}" for n in range(8)], 1.0)
+    _store_with_conf("other", ["photosynthesis in green plants"], 1.0)
+    hits = retrieval.retrieve(Query(query_id="q", question_text="data visualization chart", user_id="u"), top_k=5)
+    assert len(hits) == 5 and all(chunk.chunk_id.startswith("typed:") for chunk, _ in hits)
+
+
+def _store_with_conf(doc_id: str, texts: list[str], conf: float) -> None:
+    chunks = [RecognizedChunk(chunk_id=f"{doc_id}:{i}", text=t, raw_conf=conf, calibrated_conf=conf) for i, t in enumerate(texts)]
+    vector_store.add_chunks(doc_id, embedder.embed_chunks(chunks))
