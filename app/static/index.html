@@ -6,152 +6,170 @@
 <title>DocBlendAI</title>
 <style>
   :root {
-    color-scheme: light dark;  /* native scrollbars and dropdowns follow the theme */
-    --bg: #f7f5f0; --panel: #ffffff; --text: #1f1e1b; --muted: #6b675f; --faint: #8d887e; --line: #e4dfd5;
-    --accent: #2f5d50; --accent-hover: #244a40; --accent-text: #ffffff; --accent-soft: #e8efec;
-    --field: #fbfaf7; --quote: #f4f1ea;
-    --certain: #2e7d4f; --certain-bg: #e8f3ec;
-    --moderate: #9a5b00; --moderate-bg: #fbf0dc;
-    --uncertain: #5f5b53; --uncertain-bg: #efece6;
-    --unreadable: #b3261e; --unreadable-bg: #fae7e4;
-    --error: #b3261e;
+    color-scheme: light;
+    --bg: #f6f3ec;          /* warm off-white page */
+    --surface: #fffdf9;     /* cards and panels */
+    --sunk: #f1ede4;        /* inputs, quotes */
+    --ink: #1c2a3a;         /* body text (dark navy) */
+    --navy: #1f3a5f;        /* headings, header bar */
+    --muted: #5c6673;
+    --faint: #858c95;
+    --line: #dcd6ca;
+    --teal: #3f7f7a;        /* actions and links */
+    --teal-dark: #2f6560;
+    --teal-soft: #e4efed;
+    --certain: #2f6b4f;    --certain-bg: #e5efe8;
+    --moderate: #8a5a12;   --moderate-bg: #f5ebd8;
+    --uncertain: #4d5968;  --uncertain-bg: #e8eaed;
+    --unreadable: #9b2c2c; --unreadable-bg: #f5e2df;
+    --error: #9b2c2c;
+    --radius: 4px;
     --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1a1917; --panel: #23221f; --text: #ece9e2; --muted: #a8a397; --faint: #8a857a; --line: #37342f;
-      --accent: #86b8a8; --accent-hover: #9ccabb; --accent-text: #112019; --accent-soft: #28332f;
-      --field: #1e1d1a; --quote: #2a2925;
-      --certain: #7fcf9c; --certain-bg: #1f3027;
-      --moderate: #e7b565; --moderate-bg: #372b17;
-      --uncertain: #b9b4a9; --uncertain-bg: #2e2c28;
-      --unreadable: #f0907f; --unreadable-bg: #3a211d;
-      --error: #f0907f;
-    }
-  }
 
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); }
-  h1, h2 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.005em; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+  h1, h2, h3 { font-family: var(--serif); color: var(--navy); font-weight: 600; }
   button, input, select, textarea { font: inherit; color: inherit; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  /* --- page frame --- */
-  .top { border-bottom: 1px solid var(--line); background: var(--panel); }
-  .top-inner { max-width: 1160px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
-  .top h1 { margin: 0; font-size: 24px; }
-  .top p { margin: 0; color: var(--muted); font-size: 15px; }
-  main { max-width: 1160px; margin: 0 auto; padding: 28px 24px 56px;
-         display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 28px; align-items: start; }
-  @media (max-width: 880px) {
-    main { grid-template-columns: minmax(0, 1fr); padding: 20px 16px 40px; gap: 20px; }
-    .top-inner { padding: 14px 16px; }
-  }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
-  .panel h2 { margin: 0 0 4px; font-size: 20px; }
-  .panel .lead { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+  /* ---- header ---- */
+  .masthead { background: var(--navy); color: #f3f0e8; }
+  .masthead-inner { max-width: 1180px; margin: 0 auto; padding: 16px 28px; display: flex; align-items: baseline;
+                    gap: 18px; flex-wrap: wrap; }
+  .masthead h1 { margin: 0; font-size: 23px; color: #fff; letter-spacing: 0.01em; }
+  .masthead p { margin: 0; font-size: 14.5px; color: #c9d1dc; }
 
-  /* --- buttons & fields --- */
-  .btn { border: 0; border-radius: 7px; padding: 10px 18px; font-weight: 600; font-size: 15px; cursor: pointer;
-         background: var(--accent); color: var(--accent-text); }
-  .btn:hover:not(:disabled) { background: var(--accent-hover); }
+  /* ---- layout ---- */
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 28px 60px;
+         display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 900px) {
+    main { grid-template-columns: minmax(0, 1fr); padding: 20px 16px 40px; gap: 20px; }
+    .masthead-inner { padding: 14px 16px; }
+  }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 22px 24px; }
+  .panel-head { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 18px; }
+  .panel-head h2 { margin: 0; font-size: 20px; }
+  .panel-head p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+
+  /* ---- controls ---- */
+  .btn { border: 1px solid var(--teal); border-radius: var(--radius); padding: 9px 20px; font-weight: 600; font-size: 15px;
+         background: var(--teal); color: #fff; cursor: pointer; }
+  .btn:hover:not(:disabled) { background: var(--teal-dark); border-color: var(--teal-dark); }
   .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-  .field-label { display: block; font-size: 14px; font-weight: 600; margin: 16px 0 6px; }
-  select, textarea { width: 100%; background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; }
-  select { font-size: 15px; }
-  textarea { resize: vertical; min-height: 96px; font-size: 16px; line-height: 1.5; }
-  .hint { font-size: 13px; color: var(--faint); margin: 6px 0 0; }
-  .status { font-size: 14px; color: var(--muted); margin: 12px 0 0; min-height: 1.4em; }
+  .field-label { display: block; font-size: 14px; font-weight: 600; color: var(--navy); margin: 0 0 6px; }
+  select, textarea { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+                     padding: 9px 11px; }
+  select:hover, textarea:hover { border-color: #c8c0b1; }
+  textarea { resize: vertical; min-height: 104px; font-size: 16px; line-height: 1.5; }
+  .status { font-size: 14px; color: var(--muted); margin: 10px 0 0; min-height: 1.4em; }
   .status.error { color: var(--error); }
   .status.ok { color: var(--certain); }
 
-  /* --- upload drop zone --- */
-  .drop { display: block; border: 1.5px dashed var(--line); border-radius: 9px; padding: 22px 16px; text-align: center;
-          background: var(--field); cursor: pointer; transition: border-color .15s, background .15s; }
-  .drop:hover, .drop.dragging { border-color: var(--accent); background: var(--accent-soft); }
-  .drop strong { display: block; font-size: 15px; }
-  .drop span { font-size: 13px; color: var(--muted); }
-  .drop .chosen { display: block; margin-top: 8px; font-size: 14px; color: var(--text); font-weight: 600; word-break: break-all; }
-  .upload-actions { display: flex; gap: 12px; align-items: end; margin-top: 4px; }
-  .upload-actions > div { flex: 1; }
-  .upload-actions .field-label { margin-top: 14px; }
+  /* ---- upload ---- */
+  .drop { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 24px 16px;
+          border: 1.5px dashed #c5bdae; border-radius: var(--radius); background: var(--sunk);
+          text-align: center; cursor: pointer; transition: border-color .12s, background-color .12s; }
+  .drop:hover, .drop.dragging { border-color: var(--teal); background: var(--teal-soft); }
+  .drop svg { color: var(--teal); margin-bottom: 4px; }
+  .drop strong { font-size: 15px; color: var(--navy); }
+  .drop .types { font-size: 13px; color: var(--muted); }
+  .drop .chosen { margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--teal-dark); word-break: break-all; }
+  .upload-row { display: flex; gap: 10px; align-items: end; margin-top: 16px; }
+  .upload-row > div { flex: 1; min-width: 0; }
 
-  /* --- document list --- */
-  .docs-head { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 8px;
-               padding-top: 18px; border-top: 1px solid var(--line); }
-  .docs-head h3 { margin: 0; font-size: 15px; }
-  .docs-head .count { font-size: 13px; color: var(--muted); }
-  ul.docs { list-style: none; margin: 0; padding: 0; }
-  ul.docs li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
-  ul.docs li:last-child { border-bottom: 0; }
-  .ftype { flex: none; width: 42px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
-           color: var(--accent); border: 1px solid var(--line); border-radius: 5px; padding: 3px 0; background: var(--field); }
+  /* ---- document cards ---- */
+  .docs-head { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 10px; }
+  .docs-head h3 { margin: 0; font-size: 16px; }
+  .docs-head span { font-size: 13px; color: var(--muted); }
+  ul.docs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .doc { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface);
+         border: 1px solid var(--line); border-radius: var(--radius); }
+  .doc:hover { border-color: #c8c0b1; }
+  .ftype { flex: none; width: 44px; padding: 4px 0; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+           color: var(--navy); background: var(--sunk); border: 1px solid var(--line); border-radius: 3px; }
   .doc-info { flex: 1; min-width: 0; }
-  .doc-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+  .doc-name { display: block; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .doc-meta { display: block; font-size: 13px; color: var(--muted); }
-  .remove { flex: none; background: none; border: 0; color: var(--faint); font-size: 13px; cursor: pointer;
-            padding: 4px 6px; border-radius: 5px; text-decoration: underline; text-underline-offset: 2px; }
-  .remove:hover { color: var(--error); }
-  .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+  .remove { flex: none; background: none; border: 0; padding: 4px; font-size: 13px; color: var(--faint); cursor: pointer; }
+  .remove:hover { color: var(--error); text-decoration: underline; }
+  .empty { font-size: 14px; color: var(--muted); padding: 12px; border: 1px dashed var(--line); border-radius: var(--radius); }
 
-  /* --- ask & answers --- */
-  .ask-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
-  .ask-row .hint { margin: 0; }
-  .legend { margin-top: 16px; font-size: 14px; }
-  .legend summary { cursor: pointer; color: var(--accent); font-size: 14px; }
-  .legend dl { margin: 10px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
-  .legend dt { font-weight: 600; }
+  /* ---- ask ---- */
+  .ask-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
+  .ask-row small { font-size: 13px; color: var(--faint); }
+  .legend { margin-top: 18px; font-size: 14px; }
+  .legend summary { cursor: pointer; color: var(--teal-dark); }
+  .legend dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; margin: 12px 0 0; }
   .legend dd { margin: 0; color: var(--muted); }
 
-  #answers { margin-top: 8px; }
-  .no-answers { margin-top: 24px; padding: 18px; border-radius: 9px; background: var(--quote); color: var(--muted); font-size: 15px; }
-  .answer { margin-top: 22px; padding: 18px 20px; border: 1px solid var(--line); border-left: 4px solid var(--tier);
-            border-radius: 9px; background: var(--panel); }
-  .answer.Certain { --tier: var(--certain); --tier-bg: var(--certain-bg); }
-  .answer.Moderate { --tier: var(--moderate); --tier-bg: var(--moderate-bg); }
-  .answer.Uncertain { --tier: var(--uncertain); --tier-bg: var(--uncertain-bg); }
-  .answer.Unreadable { --tier: var(--unreadable); --tier-bg: var(--unreadable-bg); }
-  .answer .q { margin: 0 0 10px; font-family: var(--serif); font-size: 18px; font-weight: 600; }
-  .answer .body { font-size: 16px; }
+  /* ---- reliability tag ---- */
+  .tag { display: inline-flex; align-items: center; gap: 7px; padding: 3px 9px; border-radius: 3px;
+         font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+         color: var(--tier); background: var(--tier-bg); }
+  .tag::before { content: ""; width: 8px; height: 8px; background: var(--tier); }
+  .Certain { --tier: var(--certain); --tier-bg: var(--certain-bg); }
+  .Moderate { --tier: var(--moderate); --tier-bg: var(--moderate-bg); }
+  .Uncertain { --tier: var(--uncertain); --tier-bg: var(--uncertain-bg); }
+  .Unreadable { --tier: var(--unreadable); --tier-bg: var(--unreadable-bg); }
+
+  /* ---- answers ---- */
+  #answers { margin-top: 26px; display: grid; gap: 18px; }
+  .no-answers { margin: 0; padding: 16px; font-size: 15px; color: var(--muted); background: var(--sunk); border-radius: var(--radius); }
+  .answer { border: 1px solid var(--line); border-top: 3px solid var(--tier); border-radius: var(--radius); background: var(--surface); }
+  .answer-head { padding: 14px 18px 0; }
+  .answer .q { margin: 10px 0 0; font-family: var(--serif); font-size: 18px; color: var(--navy); font-weight: 600; }
+  .answer .body { padding: 8px 18px 4px; font-size: 16px; }
   .answer .body p { margin: 0 0 10px; }
   .answer .body ul, .answer .body ol { margin: 0 0 10px; padding-left: 22px; }
   .answer .body li { margin-bottom: 4px; }
-  .trust { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding: 9px 12px;
-           border-radius: 7px; background: var(--tier-bg); font-size: 14px; }
-  .trust b { color: var(--tier); }
-  .trust span { color: var(--muted); }
-  .answer details { margin-top: 12px; }
-  .answer summary { cursor: pointer; color: var(--accent); font-size: 14px; }
-  .source { margin-top: 12px; }
-  .source .where { font-size: 14px; font-weight: 600; }
-  .source .scores { font-size: 13px; color: var(--muted); font-weight: 400; }
-  .source blockquote { margin: 6px 0 0; padding: 10px 12px; background: var(--quote); border-radius: 7px;
-                       font-size: 14px; line-height: 1.55; white-space: pre-wrap; max-height: 180px; overflow: auto; }
+  .answer .why { margin: 0 18px 14px; font-size: 14px; color: var(--muted); }
+  .sources { border-top: 1px solid var(--line); padding: 12px 18px 14px; background: #fbf9f4; }
+  .sources h4 { margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .sources ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .cite { font-size: 14px; }
+  /* Reference-list layout: the number in its own column, everything else aligned beside it. */
+  .cite { display: grid; grid-template-columns: 28px minmax(0, 1fr); }
+  .cite-n { grid-row: span 3; font-weight: 700; color: var(--teal-dark); }
+  .cite-where { font-weight: 600; overflow-wrap: anywhere; }
+  .cite-scores { color: var(--faint); font-size: 13px; }
+  .nowrap { white-space: nowrap; }
+  .cite details { margin: 2px 0 0; }
+  .cite summary { cursor: pointer; font-size: 13px; color: var(--teal-dark); }
+  .cite blockquote { margin: 6px 0 2px; padding: 8px 12px; border-left: 3px solid var(--line); background: var(--sunk);
+                     font-size: 14px; line-height: 1.55; white-space: pre-wrap; max-height: 200px; overflow: auto; }
 </style>
 </head>
 <body>
-<header class="top">
-  <div class="top-inner">
+<header class="masthead">
+  <div class="masthead-inner">
     <h1>DocBlendAI</h1>
-    <p>Ask questions about your notes: typed, scanned or handwritten. Every answer tells you how far to trust it.</p>
+    <p>Question answering over typed, scanned and handwritten academic material, with a reliability label on every answer.</p>
   </div>
 </header>
 
 <main>
+  <!-- Documents -->
   <section class="panel" aria-labelledby="docs-title">
-    <h2 id="docs-title">Your documents</h2>
-    <p class="lead">Add the notes you want to ask about.</p>
+    <div class="panel-head">
+      <h2 id="docs-title">Documents</h2>
+      <p>Upload the material you want to ask about.</p>
+    </div>
     <form id="upload-form">
       <label class="drop" id="drop" for="file">
-        <strong>Drag a file here, or click to choose</strong>
-        <span>PDF, Word, PowerPoint, text, or a photo/scan (JPG, PNG, TIFF, BMP, WEBP)</span>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <strong>Drag a file here, or click to browse</strong>
+        <span class="types">PDF, Word, PowerPoint, text, or an image (JPG, PNG, TIFF, BMP, WEBP)</span>
         <span class="chosen" id="chosen"></span>
       </label>
       <input type="file" id="file" class="visually-hidden" required
              accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
-      <div class="upload-actions">
+      <div class="upload-row">
         <div>
           <label class="field-label" for="hint">Document type</label>
           <select id="hint">
@@ -167,37 +185,40 @@
     </form>
 
     <div class="docs-head">
-      <h3>Uploaded</h3>
-      <span class="count" id="doc-count"></span>
+      <h3>Uploaded documents</h3>
+      <span id="doc-count"></span>
     </div>
     <ul class="docs" id="docs"></ul>
   </section>
 
+  <!-- Ask -->
   <section class="panel" aria-labelledby="ask-title">
-    <h2 id="ask-title">Ask a question</h2>
-    <p class="lead">Answers come only from your uploaded documents.</p>
+    <div class="panel-head">
+      <h2 id="ask-title">Ask a Question</h2>
+      <p>Answers are drawn only from your uploaded documents, with page and line references.</p>
+    </div>
     <form id="ask-form">
-      <label class="visually-hidden" for="question">Your question</label>
+      <label class="field-label" for="question">Your question</label>
       <textarea id="question" placeholder="e.g. What does second normal form remove?" required></textarea>
       <div class="ask-row">
-        <p class="hint">Press Enter to ask, Shift + Enter for a new line.</p>
+        <small>Enter to ask · Shift + Enter for a new line</small>
         <button type="submit" class="btn" id="ask-btn">Ask</button>
       </div>
       <p class="status" id="ask-status" role="status"></p>
     </form>
 
     <details class="legend">
-      <summary>What do the trust labels mean?</summary>
+      <summary>How reliability labels are assigned</summary>
       <dl>
-        <dt style="color: var(--certain)">Certain</dt><dd>Found in clearly readable text that matches the question well.</dd>
-        <dt style="color: var(--moderate)">Moderate</dt><dd>Probably right, but the match was looser or the text was partly hard to read.</dd>
-        <dt style="color: var(--uncertain)">Uncertain</dt><dd>No strong supporting passage. Check the source yourself.</dd>
-        <dt style="color: var(--unreadable)">Unreadable</dt><dd>The relevant page could not be read reliably (poor scan or handwriting).</dd>
+        <dt><span class="tag Certain">Certain</span></dt><dd>Strong match in clearly readable text.</dd>
+        <dt><span class="tag Moderate">Moderate</span></dt><dd>Relevant text found, but the match was looser or the text was partly legible.</dd>
+        <dt><span class="tag Uncertain">Uncertain</span></dt><dd>No strong supporting passage. Verify against the source.</dd>
+        <dt><span class="tag Unreadable">Unreadable</span></dt><dd>The relevant passage could not be read reliably (poor scan or handwriting).</dd>
       </dl>
     </details>
 
     <div id="answers">
-      <p class="no-answers" id="no-answers">Your answers will appear here, newest first.</p>
+      <p class="no-answers" id="no-answers">Answers will appear here, newest first.</p>
     </div>
   </section>
 </main>
@@ -219,7 +240,7 @@ function nameFromPath(doc) {
   return base.startsWith(doc.doc_id + "_") ? base.slice(doc.doc_id.length + 1) : base;
 }
 function docLabel(id) { return docNames[id] || id.slice(0, 8); }
-function typeTag(name) { const ext = name.split(".").pop().toLowerCase(); return TYPE_TAG[ext] || "IMG"; }
+function typeTag(name) { return TYPE_TAG[name.split(".").pop().toLowerCase()] || "IMG"; }
 function pages(n) { return `${n} page${n === 1 ? "" : "s"}`; }
 
 function el(tag, attrs = {}, ...children) {
@@ -265,6 +286,7 @@ function setStatus(id, text, kind = "") {
   s.textContent = text;
 }
 
+// ---- documents ----
 async function deleteDoc(d, button) {
   if (!confirm(`Remove "${docLabel(d.doc_id)}"? It is removed from DocBlendAI only; your original file is not touched.`)) return;
   button.disabled = true;
@@ -283,13 +305,13 @@ async function loadDocs() {
   const docs = await api("/documents");
   list.replaceChildren();
   document.getElementById("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
-  if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
+  if (!docs.length) { list.append(el("li", { class: "empty" }, "No documents uploaded yet.")); return; }
   for (const d of docs) {
     const name = nameFromPath(d);
     docNames[d.doc_id] = name;
     const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
     remove.addEventListener("click", () => deleteDoc(d, remove));
-    list.append(el("li", {},
+    list.append(el("li", { class: "doc" },
       el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(name)),
       el("span", { class: "doc-info" },
         el("span", { class: "doc-name", title: name }, name),
@@ -298,15 +320,14 @@ async function loadDocs() {
   }
 }
 
-// --- upload: click or drag a file onto the drop zone ---
+// ---- upload: click the box, or drop a file anywhere on the page ----
 const fileInput = document.getElementById("file"), drop = document.getElementById("drop");
 function showChosen() {
   const f = fileInput.files[0];
-  document.getElementById("chosen").textContent = f ? f.name : "";
+  document.getElementById("chosen").textContent = f ? `Selected: ${f.name}` : "";
 }
 fileInput.addEventListener("change", showChosen);
-// A file dropped anywhere on the page goes to the upload box (instead of the browser
-// opening it and leaving the app); the box lights up while a file is dragged over the page.
+// A file dropped anywhere goes to the upload box (instead of the browser opening it and leaving the app).
 const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
 window.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); drop.classList.add("dragging"); } });
 window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) drop.classList.remove("dragging"); });
@@ -347,14 +368,25 @@ document.getElementById("upload-form").addEventListener("submit", async (e) => {
   } finally { btn.disabled = false; btn.textContent = "Upload"; }
 });
 
-// --- ask ---
-function sourceView(s) {
-  const where = [docLabel(s.doc_id), s.page ? `page ${s.page}` : null].filter(Boolean).join(", ");
+// ---- ask ----
+function citeWhere(s) {
+  // "notes.pdf · Page 3, lines 12–18"; the page/line part never breaks across lines.
+  const span = el("span", { class: "cite-where" }, docLabel(s.doc_id));
+  if (s.page) {
+    let where = `Page ${s.page}`;
+    if (s.first_line) where += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
+    span.append(" · ", el("span", { class: "nowrap" }, where));
+  }
+  return span;
+}
+
+function citation(s, n) {
   const pct = (v) => `${Math.round(v * 100)}%`;
-  return el("div", { class: "source" },
-    el("div", { class: "where" }, where, " ",
-      el("span", { class: "scores" }, `· match ${pct(s.similarity)} · readability ${pct(s.confidence)}`)),
-    el("blockquote", {}, s.text));
+  return el("li", { class: "cite" },
+    el("span", { class: "cite-n" }, `[${n}]`),
+    citeWhere(s),
+    el("span", { class: "cite-scores" }, `match ${pct(s.similarity)} · readability ${pct(s.confidence)}`),
+    el("details", {}, el("summary", {}, "Show passage"), el("blockquote", {}, s.text)));
 }
 
 const question = document.getElementById("question");
@@ -377,13 +409,15 @@ document.getElementById("ask-form").addEventListener("submit", async (e) => {
     const sources = await api(`/answer/${answer.answer_id}/sources`);
     const label = answer.reliability_label;
     const card = el("article", { class: `answer ${label}` },
-      el("p", { class: "q" }, text),
+      el("div", { class: "answer-head" },
+        el("span", { class: `tag ${label}` }, label),
+        el("p", { class: "q" }, text)),
       renderAnswer(answer.answer_text),
-      el("div", { class: "trust" }, el("b", {}, label), el("span", {}, WHY[label])));
+      el("p", { class: "why" }, WHY[label]));
     if (sources.length) {
-      const details = el("details", {}, el("summary", {}, `Show where this came from (${sources.length})`));
-      sources.forEach((s) => details.append(sourceView(s)));
-      card.append(details);
+      const list = el("ol", {});
+      sources.forEach((s, i) => list.append(citation(s, i + 1)));
+      card.append(el("div", { class: "sources" }, el("h4", {}, "Sources"), list));
     }
     document.getElementById("no-answers")?.remove();
     document.getElementById("answers").prepend(card);

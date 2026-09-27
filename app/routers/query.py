@@ -62,7 +62,10 @@ class AnswerSource(RetrievalResult):
     """
 
     doc_id: str
-    page: int | None = None  # 1-based; None for chunks stored before page numbers were recorded
+    # Citation: 1-based page and non-empty-line range; None for chunks stored before these were recorded.
+    page: int | None = None
+    first_line: int | None = None
+    last_line: int | None = None
     content_type: ContentType
     text: str
 
@@ -80,7 +83,7 @@ def get_answer_sources(answer_id: str, db: Session = Depends(get_db)) -> list[An
         .all()
     )
     chunks = vector_store.get_chunks([r.chunk_id for r in results])
-    pages = vector_store.get_pages([r.chunk_id for r in results])
+    locations = vector_store.get_locations([r.chunk_id for r in results])
     sources = []
     for r in results:
         chunk = chunks.get(r.chunk_id)
@@ -90,7 +93,7 @@ def get_answer_sources(answer_id: str, db: Session = Depends(get_db)) -> list[An
             AnswerSource(
                 **RetrievalResult.model_validate(r).model_dump(),
                 doc_id=r.chunk_id.rsplit(":", 1)[0],
-                page=pages.get(r.chunk_id),
+                **locations.get(r.chunk_id, {}),
                 content_type=chunk.content_type,
                 text=chunk.text,
             )
