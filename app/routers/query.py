@@ -22,17 +22,40 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["query"])
 
 
-# Plain `def`: embedding and generation are blocking network calls, so FastAPI runs this in its threadpool.
-@router.post("/ask", response_model=Answer)
-def ask(query: Query, db: Session = Depends(get_db)) -> Answer:
+Turn = tuple[str, str]  # (question, answer) from earlier in a conversation
+
+
+def _retrieve(query: Query, history: list[Turn] | None):
+    """Retrieve for the question; in a conversation, also for (previous question + this one).
+
+    A follow-up like "explain it in more detail" has nothing to match on its own,
+    so the previous question is searched with it and the better-scored chunks win.
+    A self-contained new question still finds its own chunks through the first search.
+    """
+    hits = retrieval.retrieve(query, settings.top_k)
+    if not history:
+        return hits
+    follow_up = query.model_copy(update={"question_text": f"{history[-1][0]}\n{query.question_text}"})
+    best = {chunk.chunk_id: (chunk, result) for chunk, result in hits}
+    for chunk, result in retrieval.retrieve(follow_up, settings.top_k):
+        if chunk.chunk_id not in best or result.combined_score > best[chunk.chunk_id][1].combined_score:
+            best[chunk.chunk_id] = (chunk, result)
+    return sorted(best.values(), key=lambda pair: pair[1].combined_score, reverse=True)[: settings.top_k]
+
+
+def answer_and_store(query: Query, db: Session, history: list[Turn] | None = None) -> Answer:
+    """Modules 5 -> 6 -> 7 for one question, then store Query, Answer, and RetrievalResults.
+
+    Raises HTTPException 409 for a reused query_id and 502 if Gemini fails.
+    """
     if db.get(QueryORM, query.query_id) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, f"query_id {query.query_id!r} already exists")
 
     try:
-        hits = retrieval.retrieve(query, settings.top_k)
+        hits = _retrieve(query, history)
         results = [r for _, r in hits]
         label = reliability.classify_reliability(results)
-        answer = llm_answer.generate_answer(query, [c for c, _ in hits], label)
+        answer = llm_answer.generate_answer(query, [c for c, _ in hits], label, history=history)
     except (embedder.EmbeddingError, llm_answer.LLMError) as e:
         logger.error("Answering %s failed: %s", query.query_id, e)
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The answer service (LLM) failed; try again later")
@@ -44,6 +67,12 @@ def ask(query: Query, db: Session = Depends(get_db)) -> Answer:
 
     logger.info("Answered %s: %s from %d chunks", query.query_id, answer.reliability_label.value, len(results))
     return answer
+
+
+# Plain `def`: embedding and generation are blocking network calls, so FastAPI runs this in its threadpool.
+@router.post("/ask", response_model=Answer)
+def ask(query: Query, db: Session = Depends(get_db)) -> Answer:
+    return answer_and_store(query, db)
 
 
 @router.get("/answer/{answer_id}", response_model=Answer)
@@ -76,9 +105,14 @@ def get_answer_sources(answer_id: str, db: Session = Depends(get_db)) -> list[An
     row = db.get(AnswerORM, answer_id)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Answer not found")
+    return sources_for_query(row.query_id, db)
+
+
+def sources_for_query(query_id: str, db: Session) -> list[AnswerSource]:
+    """The chunks retrieved for a question, with text and citation, best combined_score first."""
     results = (
         db.query(RetrievalResultORM)
-        .filter_by(query_id=row.query_id)
+        .filter_by(query_id=query_id)
         .order_by(RetrievalResultORM.combined_score.desc())
         .all()
     )

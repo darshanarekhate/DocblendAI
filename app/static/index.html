@@ -16,7 +16,7 @@
     --faint: #8a929c;
     --line: #e2ddd3;
     --line-strong: #cfc8bb;
-    --blue: #4b6a8c;        /* muted blue buttons and links */
+    --blue: #4b6a8c;        /* muted blue: buttons, links, active items */
     --blue-hover: #3e5a78;
     --blue-soft: #e8eef4;
     --green: #5a8f6e;       /* soft green: confidence scores */
@@ -27,144 +27,229 @@
     --unreadable: #9a3b34; --unreadable-bg: #f4e4e1;
     --error: #9a3b34;
     --radius: 6px;
+    --header-h: 56px;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
   }
 
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
-  h1, h2 { color: var(--heading); margin: 0; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15.5px/1.6 var(--sans); overflow: hidden; }
+  h1, h2, h3 { color: var(--heading); margin: 0; }
   button, input, select, textarea { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  [hidden] { display: none !important; }
 
-  /* ---- header ---- */
-  header { border-bottom: 1px solid var(--line); background: var(--surface); }
-  .header-inner { max-width: 1200px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
-  header h1 { font-family: var(--serif); font-size: 22px; font-weight: 600; }
-  header p { margin: 0; font-size: 14px; color: var(--muted); }
+  /* ---------- app frame: header + three independently scrolling columns ---------- */
+  header { height: var(--header-h); display: flex; align-items: center; gap: 12px; padding: 0 18px;
+           background: var(--surface); border-bottom: 1px solid var(--line); }
+  header h1 { font-family: var(--serif); font-size: 21px; font-weight: 600; }
+  header .tagline { font-size: 13.5px; color: var(--muted); }
+  header .spacer { flex: 1; }
+  .panel-toggle { display: none; }
+  .app { height: calc(100% - var(--header-h)); display: grid; grid-template-columns: 260px minmax(0, 1fr) 380px; }
+  .sidebar, .docs-panel { overflow-y: auto; background: var(--surface); }
+  .sidebar { border-right: 1px solid var(--line); padding: 14px 12px; overflow-x: hidden; }
+  .docs-panel { border-left: 1px solid var(--line); padding: 16px; display: grid; gap: 22px; align-content: start; }
+  .chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
-  /* ---- layout ---- */
-  main { max-width: 1200px; margin: 0 auto; padding: 24px 24px 56px;
-         display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 24px; align-items: start; }
-  .column { display: grid; gap: 20px; min-width: 0; }
-  @media (max-width: 920px) {
-    main { grid-template-columns: minmax(0, 1fr); padding: 16px 16px 40px; gap: 20px; }
-    .header-inner { padding: 12px 16px; }
-  }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; min-width: 0; }
-  .card-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
-  .card-title h2 { font-size: 17px; font-weight: 600; }
-  .card-title span { font-size: 13px; color: var(--muted); }
-
-  /* ---- controls ---- */
+  /* ---------- buttons & fields ---------- */
   .btn { border: 1px solid var(--blue); border-radius: var(--radius); background: var(--blue); color: #fff;
-         padding: 9px 18px; font-size: 15px; font-weight: 600; cursor: pointer; }
+         padding: 8px 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
   .btn:hover:not(:disabled) { background: var(--blue-hover); border-color: var(--blue-hover); }
   .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-  .btn-quiet { border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface);
-               padding: 4px 10px; font-size: 14px; cursor: pointer; color: var(--ink); }
-  .btn-quiet:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
-  .btn-quiet:disabled { opacity: 0.4; cursor: default; }
-  label.field { display: block; font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+  .btn-outline { border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface);
+                 padding: 7px 12px; font-size: 14px; cursor: pointer; }
+  .btn-outline:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+  .btn-outline:disabled { opacity: 0.4; cursor: default; }
+  .icon-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 4px;
+              background: none; color: var(--faint); cursor: pointer; }
+  .icon-btn:hover { background: var(--sunk); color: var(--ink); }
+  .icon-btn.danger:hover { color: var(--error); }
   select, textarea { width: 100%; background: var(--surface); border: 1px solid var(--line-strong);
-                     border-radius: var(--radius); padding: 9px 11px; }
-  textarea { resize: vertical; min-height: 96px; font-size: 16px; line-height: 1.5; }
-  .status { font-size: 14px; color: var(--muted); margin: 10px 0 0; min-height: 1.4em; }
-  .status:empty { margin: 0; min-height: 0; }
+                     border-radius: var(--radius); padding: 8px 10px; }
+  .section-title { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 10px; }
+  .section-title h2 { font-size: 15px; font-weight: 600; }
+  .section-title span { font-size: 12.5px; color: var(--muted); }
+  .status { font-size: 13.5px; color: var(--muted); margin: 8px 0 0; }
+  .status:empty { display: none; }
   .status.error { color: var(--error); }
   .status.ok { color: var(--certain); }
 
-  /* ---- upload ---- */
-  .drop { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 22px 14px; text-align: center;
-          border: 1.5px dashed var(--line-strong); border-radius: var(--radius); background: var(--sunk); cursor: pointer; }
-  .drop:hover, .drop.dragging { border-color: var(--blue); background: var(--blue-soft); }
-  .drop svg { color: var(--blue); margin-bottom: 6px; }
-  .drop strong { font-size: 15px; font-weight: 600; }
-  .drop small { font-size: 13px; color: var(--muted); }
-  .drop .chosen { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--blue); word-break: break-all; }
-  .upload-row { display: flex; gap: 10px; align-items: end; margin-top: 14px; }
-  .upload-row > div { flex: 1; min-width: 0; }
+  /* ---------- sidebar: chat history ---------- */
+  .new-chat { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 18px; }
+  .history-label { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint);
+                   margin: 0 6px 6px; }
+  ul.chats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .chat-item { display: flex; align-items: center; gap: 2px; border-radius: var(--radius); }
+  .chat-item:hover { background: var(--sunk); }
+  .chat-item.active { background: var(--blue-soft); }
+  .chat-open { flex: 1; min-width: 0; border: 0; background: none; text-align: left; padding: 7px 8px; cursor: pointer; }
+  .chat-title { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-item.active .chat-title { font-weight: 600; color: var(--heading); }
+  .chat-when { display: block; font-size: 12px; color: var(--faint); }
+  .chat-actions { display: flex; opacity: 0; padding-right: 4px; }
+  .chat-item:hover .chat-actions, .chat-item.active .chat-actions, .chat-item:focus-within .chat-actions { opacity: 1; }
+  @media (hover: none) { .chat-actions { opacity: 1; } }
+  .muted-note { font-size: 13.5px; color: var(--muted); margin: 4px 6px; }
 
-  /* ---- documents ---- */
-  ul.docs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .doc { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--line);
-         border-radius: var(--radius); background: var(--surface); }
-  .doc.selected { border-color: var(--blue); background: var(--blue-soft); }
-  .doc-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; background: none; border: 0;
-              padding: 0; text-align: left; cursor: pointer; }
-  .ftype { flex: none; width: 42px; padding: 3px 0; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
-           color: var(--blue); background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; }
-  .doc-info { min-width: 0; }
-  .doc-name { display: block; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .doc-meta { display: block; font-size: 13px; color: var(--muted); }
-  .remove { flex: none; background: none; border: 0; padding: 4px; font-size: 13px; color: var(--faint); cursor: pointer; }
-  .remove:hover { color: var(--error); text-decoration: underline; }
-  .empty { margin: 0; font-size: 14px; color: var(--muted); }
+  /* ---------- chat column ---------- */
+  .messages { flex: 1; overflow-y: auto; padding: 24px 28px 12px; }
+  .messages-inner { max-width: 780px; margin: 0 auto; display: grid; gap: 18px; }
+  .welcome { max-width: 520px; margin: 12vh auto 0; text-align: center; }
+  .welcome h2 { font-family: var(--serif); font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+  .welcome p { margin: 0; color: var(--muted); }
+  .msg-user { justify-self: end; max-width: 78%; padding: 10px 14px; border-radius: 10px 10px 2px 10px;
+              background: var(--blue-soft); color: var(--heading); white-space: pre-wrap; }
+  .msg-bot { justify-self: stretch; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line);
+             border-radius: 10px 10px 10px 2px; }
+  .msg-bot .top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .msg-bot .who { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .msg-bot .body p { margin: 0 0 10px; }
+  .msg-bot .body p:last-child { margin-bottom: 0; }
+  .msg-bot .body ul, .msg-bot .body ol { margin: 0 0 10px; padding-left: 22px; }
+  .msg-bot .why { margin: 10px 0 0; font-size: 13.5px; color: var(--muted); }
+  .msg-bot.pending .body { color: var(--muted); }
+  .msg-bot.failed { border-color: #e7c9c4; }
+  .msg-bot.failed .body { color: var(--error); }
+  .dots::after { content: "…"; display: inline-block; width: 1.2em; animation: dots 1.2s steps(4) infinite; overflow: hidden;
+                 vertical-align: bottom; }
+  @keyframes dots { 0% { width: 0; } 100% { width: 1.2em; } }
 
-  /* ---- preview ---- */
-  .preview-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-  .preview-nav .where { font-size: 14px; color: var(--muted); }
-  .preview-name { font-size: 14px; font-weight: 600; margin: -6px 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .preview-page { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; overflow: auto; max-height: 560px; }
-  .preview-page img { display: block; width: 100%; height: auto; }
-  .preview-page pre { margin: 0; padding: 14px; font: 14px/1.6 var(--sans); white-space: pre-wrap; }
-  .preview-open { display: inline-block; margin-top: 8px; font-size: 13px; color: var(--blue); }
-
-  /* ---- ask ---- */
-  .ask-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
-  .ask-row small { font-size: 13px; color: var(--faint); }
-
-  /* ---- answers ---- */
-  #answers { display: grid; gap: 16px; }
-  .answer { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
-  .answer-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .answer .q { margin: 0; font-size: 17px; font-weight: 600; color: var(--heading); }
-  .tag { flex: none; padding: 2px 10px; border-radius: 4px; font-size: 13px; font-weight: 600; color: var(--tier); background: var(--tier-bg); }
+  .tag { padding: 1px 9px; border-radius: 4px; font-size: 12.5px; font-weight: 600; color: var(--tier); background: var(--tier-bg); }
   .Certain { --tier: var(--certain); --tier-bg: var(--certain-bg); }
   .Moderate { --tier: var(--moderate); --tier-bg: var(--moderate-bg); }
   .Uncertain { --tier: var(--uncertain); --tier-bg: var(--uncertain-bg); }
   .Unreadable { --tier: var(--unreadable); --tier-bg: var(--unreadable-bg); }
-  .answer .body { margin-top: 10px; }
-  .answer .body p { margin: 0 0 10px; }
-  .answer .body ul, .answer .body ol { margin: 0 0 10px; padding-left: 22px; }
-  .answer .why { margin: 0; font-size: 14px; color: var(--muted); }
-  .sources { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-  .sources h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
-  .sources ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .cite { display: grid; grid-template-columns: 26px minmax(0, 1fr); font-size: 14px; }
+
+  .sources { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .sources > summary { cursor: pointer; font-size: 13.5px; color: var(--blue); }
+  .sources ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+  .cite { display: grid; grid-template-columns: 24px minmax(0, 1fr); font-size: 14px; }
   .cite-n { grid-row: span 3; color: var(--faint); font-weight: 600; }
   .cite-where { overflow-wrap: anywhere; }
   .cite-where b { font-weight: 600; }
   .cite-page { background: none; border: 0; padding: 0; color: var(--blue); cursor: pointer; white-space: nowrap;
                text-decoration: underline; text-underline-offset: 2px; }
-  .scores { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 3px; font-size: 13px; color: var(--muted); }
+  .scores { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 2px; font-size: 13px; color: var(--muted); }
   .meter { display: inline-flex; align-items: center; gap: 6px; }
-  .meter i { display: inline-block; width: 54px; height: 5px; border-radius: 3px; background: var(--green-bg); overflow: hidden; }
+  .meter i { display: inline-block; width: 52px; height: 5px; border-radius: 3px; background: var(--green-bg); overflow: hidden; }
   .meter i b { display: block; height: 100%; background: var(--green); }
-  .meter em { font-style: normal; color: var(--green); font-weight: 600; }
-  .cite details { margin-top: 2px; }
-  .cite summary { cursor: pointer; font-size: 13px; color: var(--blue); }
+  .meter em { font-style: normal; font-weight: 600; color: var(--green); }
+  .cite details summary { cursor: pointer; font-size: 13px; color: var(--blue); }
   .cite blockquote { margin: 6px 0 0; padding: 8px 12px; border-left: 3px solid var(--line-strong); background: var(--sunk);
-                     border-radius: 0 4px 4px 0; white-space: pre-wrap; max-height: 180px; overflow: auto; }
+                     border-radius: 0 4px 4px 0; white-space: pre-wrap; max-height: 180px; overflow: auto; font-size: 13.5px; }
+
+  .composer { border-top: 1px solid var(--line); background: var(--bg); padding: 12px 28px 16px; }
+  .composer form { max-width: 780px; margin: 0 auto; display: flex; gap: 10px; align-items: end;
+                   background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 8px 8px 14px; }
+  .composer form:focus-within { border-color: var(--blue); }
+  .composer textarea { border: 0; padding: 6px 0; resize: none; min-height: 24px; max-height: 180px; line-height: 1.5;
+                       background: transparent; font-size: 15.5px; }
+  .composer textarea:focus-visible { outline: none; }
+  .composer .hint { max-width: 780px; margin: 6px auto 0; font-size: 12.5px; color: var(--faint); }
+
+  /* ---------- documents panel ---------- */
+  .drop { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 12px; text-align: center;
+          border: 1.5px dashed var(--line-strong); border-radius: var(--radius); background: var(--sunk); cursor: pointer; }
+  .drop:hover, .drop.dragging { border-color: var(--blue); background: var(--blue-soft); }
+  .drop svg { color: var(--blue); margin-bottom: 4px; }
+  .drop strong { font-size: 14.5px; font-weight: 600; }
+  .drop small { font-size: 12.5px; color: var(--muted); }
+  .drop .chosen { margin-top: 6px; font-size: 13.5px; font-weight: 600; color: var(--blue); word-break: break-all; }
+  .upload-row { display: flex; gap: 8px; margin-top: 10px; }
+  .upload-row select { flex: 1; min-width: 0; font-size: 14px; }
+
+  ul.docs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .doc { display: flex; align-items: center; gap: 4px; padding: 7px 6px 7px 8px; border: 1px solid var(--line);
+         border-radius: var(--radius); background: var(--surface); }
+  .doc:hover { border-color: var(--line-strong); }
+  .doc.selected { border-color: var(--blue); background: var(--blue-soft); }
+  .doc-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; background: none; border: 0;
+              padding: 0; text-align: left; cursor: pointer; }
+  .ftype { flex: none; width: 40px; padding: 2px 0; text-align: center; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+           color: var(--blue); background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; }
+  .doc-info { min-width: 0; }
+  .doc-name { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-meta { display: block; font-size: 12.5px; color: var(--muted); }
+
+  .preview-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .preview-nav .where { font-size: 13.5px; color: var(--muted); }
+  .preview-name { font-size: 13.5px; font-weight: 600; margin: -4px 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preview-page { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; overflow: auto; max-height: 520px; }
+  .preview-page img { display: block; width: 100%; height: auto; }
+  .preview-page pre { margin: 0; padding: 12px; font: 13.5px/1.6 var(--sans); white-space: pre-wrap; }
+  .preview-open { display: inline-block; margin-top: 6px; font-size: 13px; color: var(--blue); }
+
+  /* ---------- responsive: side panels become drawers ---------- */
+  .scrim { display: none; }
+  @media (max-width: 1180px) {
+    .app { grid-template-columns: 240px minmax(0, 1fr); }
+    .docs-panel { position: fixed; top: var(--header-h); right: 0; bottom: 0; width: min(380px, 92vw); z-index: 20;
+                  transform: translateX(100%); transition: transform .18s ease; box-shadow: -1px 0 0 var(--line); }
+    body.show-docs .docs-panel { transform: none; }
+    .panel-toggle.docs { display: inline-flex; }
+  }
+  @media (max-width: 760px) {
+    header .tagline { display: none; }
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .sidebar { position: fixed; top: var(--header-h); left: 0; bottom: 0; width: min(300px, 86vw); z-index: 20;
+               transform: translateX(-100%); transition: transform .18s ease; }
+    body.show-chats .sidebar { transform: none; }
+    .panel-toggle.chats { display: inline-flex; }
+    .messages { padding: 16px 14px 8px; }
+    .composer { padding: 10px 12px 12px; }
+    .msg-user { max-width: 90%; }
+  }
+  @media (max-width: 1180px) {
+    body.show-docs .scrim, body.show-chats .scrim { display: block; position: fixed; inset: var(--header-h) 0 0 0;
+                                                    background: rgba(30, 43, 60, 0.25); z-index: 10; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <div class="header-inner">
-    <h1>DocBlendAI</h1>
-    <p>Ask questions about typed, scanned and handwritten notes. Every answer shows how far to trust it.</p>
-  </div>
+  <button type="button" class="btn-outline panel-toggle chats" id="toggle-chats" aria-controls="sidebar">Chats</button>
+  <h1>DocBlendAI</h1>
+  <span class="tagline">Question answering over typed, scanned and handwritten notes</span>
+  <span class="spacer"></span>
+  <button type="button" class="btn-outline panel-toggle docs" id="toggle-docs" aria-controls="docs-panel">Documents</button>
 </header>
 
-<main>
-  <div class="column">
-    <!-- Upload -->
-    <section class="card" aria-labelledby="upload-title">
-      <div class="card-title"><h2 id="upload-title">Upload</h2></div>
+<div class="app">
+  <!-- Chat history -->
+  <nav class="sidebar" id="sidebar" aria-label="Chats">
+    <button type="button" class="btn new-chat" id="new-chat">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      New chat
+    </button>
+    <p class="history-label">History</p>
+    <ul class="chats" id="chats"></ul>
+  </nav>
+
+  <!-- Conversation -->
+  <main class="chat" aria-label="Conversation">
+    <div class="messages" id="messages">
+      <div class="messages-inner" id="thread"></div>
+    </div>
+    <div class="composer">
+      <form id="ask-form">
+        <label class="visually-hidden" for="question">Your question</label>
+        <textarea id="question" rows="1" placeholder="Ask about your documents…" required></textarea>
+        <button type="submit" class="btn" id="ask-btn">Send</button>
+      </form>
+      <p class="hint">Enter to send · Shift + Enter for a new line · Answers come only from your uploaded documents</p>
+    </div>
+  </main>
+
+  <!-- Documents: upload, list, preview -->
+  <aside class="docs-panel" id="docs-panel" aria-label="Documents">
+    <section aria-labelledby="upload-title">
+      <div class="section-title"><h2 id="upload-title">Upload</h2></div>
       <form id="upload-form">
         <label class="drop" id="drop" for="file">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/>
           </svg>
@@ -175,62 +260,42 @@
         <input type="file" id="file" class="visually-hidden" required
                accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
         <div class="upload-row">
-          <div>
-            <label class="field" for="hint">Document type</label>
-            <select id="hint">
-              <option value="">Detect automatically</option>
-              <option value="typed">Typed</option>
-              <option value="scanned">Scanned or printed</option>
-              <option value="handwritten">Handwritten</option>
-            </select>
-          </div>
+          <label class="visually-hidden" for="hint">Document type</label>
+          <select id="hint" title="Document type">
+            <option value="">Detect type automatically</option>
+            <option value="typed">Typed</option>
+            <option value="scanned">Scanned or printed</option>
+            <option value="handwritten">Handwritten</option>
+          </select>
           <button type="submit" class="btn" id="upload-btn">Upload</button>
         </div>
         <p class="status" id="upload-status" role="status"></p>
       </form>
     </section>
 
-    <!-- Documents -->
-    <section class="card" aria-labelledby="docs-title">
-      <div class="card-title"><h2 id="docs-title">Documents</h2><span id="doc-count"></span></div>
+    <section aria-labelledby="docs-title">
+      <div class="section-title"><h2 id="docs-title">Documents</h2><span id="doc-count"></span></div>
       <ul class="docs" id="docs"></ul>
     </section>
 
-    <!-- Preview -->
-    <section class="card" id="preview" aria-labelledby="preview-title" hidden>
-      <div class="card-title"><h2 id="preview-title">Preview</h2></div>
+    <section id="preview" aria-labelledby="preview-title" hidden>
+      <div class="section-title"><h2 id="preview-title">Preview</h2>
+        <button type="button" class="icon-btn" id="close-preview" aria-label="Close preview">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
       <p class="preview-name" id="preview-name"></p>
       <div class="preview-nav">
-        <button type="button" class="btn-quiet" id="prev-page" aria-label="Previous page">‹ Prev</button>
+        <button type="button" class="btn-outline" id="prev-page" aria-label="Previous page">‹ Prev</button>
         <span class="where" id="preview-where"></span>
-        <button type="button" class="btn-quiet" id="next-page" aria-label="Next page">Next ›</button>
+        <button type="button" class="btn-outline" id="next-page" aria-label="Next page">Next ›</button>
       </div>
       <div class="preview-page" id="preview-page"></div>
       <a class="preview-open" id="preview-open" target="_blank" rel="noopener" hidden>Open page at full size</a>
     </section>
-  </div>
-
-  <div class="column">
-    <!-- Question -->
-    <section class="card" aria-labelledby="ask-title">
-      <div class="card-title"><h2 id="ask-title">Ask a question</h2></div>
-      <form id="ask-form">
-        <label class="visually-hidden" for="question">Your question</label>
-        <textarea id="question" placeholder="e.g. What does second normal form remove?" required></textarea>
-        <div class="ask-row">
-          <small>Enter to ask · Shift + Enter for a new line</small>
-          <button type="submit" class="btn" id="ask-btn">Ask</button>
-        </div>
-        <p class="status" id="ask-status" role="status"></p>
-      </form>
-    </section>
-
-    <!-- Answers -->
-    <section aria-label="Answers" id="answers">
-      <p class="card empty" id="no-answers">Answers appear here, newest first, with the pages they came from.</p>
-    </section>
-  </div>
-</main>
+  </aside>
+</div>
+<div class="scrim" id="scrim"></div>
 
 <script>
 const WHY = {
@@ -241,24 +306,44 @@ const WHY = {
 };
 const FORMAT_LABEL = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
 const TYPE_TAG = { pdf: "PDF", docx: "DOCX", pptx: "PPTX", txt: "TXT" };
+const ICON = {
+  rename: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
+  trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+};
+const $ = (id) => document.getElementById(id);
 
-// The server stores uploads as "<doc_id>_<original name>.<ext>"; recover the name from file_path.
+// ---------------- helpers ----------------
 const docNames = {};
-function nameFromPath(doc) {
+function nameFromPath(doc) {  // uploads are stored as "<doc_id>_<original name>.<ext>"
   const base = doc.file_path.split(/[\\/]/).pop();
   return base.startsWith(doc.doc_id + "_") ? base.slice(doc.doc_id.length + 1) : base;
 }
 function docLabel(id) { return docNames[id] || id.slice(0, 8); }
 function typeTag(name) { return TYPE_TAG[name.split(".").pop().toLowerCase()] || "IMG"; }
 function pages(n) { return `${n} page${n === 1 ? "" : "s"}`; }
-const $ = (id) => document.getElementById(id);
-
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) k === "class" ? (node.className = v) : node.setAttribute(k, v);
   for (const c of children) node.append(c);
   return node;
 }
+function iconButton(icon, label, extra = "") {
+  const b = el("button", { type: "button", class: `icon-btn ${extra}`.trim(), "aria-label": label, title: label });
+  b.innerHTML = ICON[icon];
+  return b;
+}
+function setStatus(id, text, kind = "") { const s = $(id); s.className = `status ${kind}`.trim(); s.textContent = text; }
+function whenLabel(iso) {
+  const d = new Date(iso), today = new Date();
+  const days = Math.floor((new Date(today.toDateString()) - new Date(d.toDateString())) / 86400000);
+  if (days === 0) return `Today, ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  if (days === 1) return "Yesterday";
+  return d.toLocaleDateString([], { day: "numeric", month: "short", year: d.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+const store = {  // per-browser convenience only (which chat was open); the chats themselves live on the server
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* private mode */ } },
+};
 
 // Answers may use light Markdown (**bold**, lists). Escape first, then format: never inject raw HTML.
 function renderAnswer(text) {
@@ -283,14 +368,13 @@ function renderAnswer(text) {
   return div;
 }
 
-// Where the DocBlendAI server is. Normally the page is served by it (same origin), but if
-// index.html was opened directly (file://) or from an editor's live preview, fall back to
-// the default local server. Checked with /health, and re-checked after a failed request.
+// ---------------- server connection ----------------
+// Normally the page is served by the DocBlendAI server (same origin). If index.html was opened
+// directly or from an editor preview, fall back to the default local server.
 const LOCAL_SERVER = "http://127.0.0.1:8000";
 const SERVER_DOWN = "Cannot reach the DocBlendAI server. Start it with: " +
   "venv/Scripts/python -m uvicorn app.main:app --port 8000, then open http://localhost:8000";
 let apiBase = null;
-
 async function findServer() {
   if (apiBase !== null) return apiBase;
   const candidates = location.protocol.startsWith("http") ? [location.origin, LOCAL_SERVER] : [LOCAL_SERVER];
@@ -298,43 +382,196 @@ async function findServer() {
     try {
       const resp = await fetch(`${base}/health`);
       if (resp.ok && (await resp.json()).status === "ok") return (apiBase = base === location.origin ? "" : base);
-    } catch { /* not this one; try the next */ }
+    } catch { /* try the next one */ }
   }
   throw new Error(SERVER_DOWN);
 }
-
 const url = (path) => `${apiBase || ""}${path}`;
-
 async function api(path, options, withStatus = false) {
   await findServer();
   let resp;
-  try {
-    resp = await fetch(url(path), options);
-  } catch {
-    apiBase = null;  // the server went away; look for it again next time
-    throw new Error(SERVER_DOWN);
-  }
+  try { resp = await fetch(url(path), options); }
+  catch { apiBase = null; throw new Error(SERVER_DOWN); }
   const body = await resp.json().catch(() => ({}));
   if (!resp.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${resp.status})`);
   return withStatus ? { body, status: resp.status } : body;
 }
+const json = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
 
-function setStatus(id, text, kind = "") {
-  const s = $(id);
-  s.className = `status ${kind}`.trim();
-  s.textContent = text;
+// ---------------- drawers (tablet / phone) ----------------
+function closeDrawers() { document.body.classList.remove("show-docs", "show-chats"); }
+$("toggle-docs").addEventListener("click", () => { document.body.classList.remove("show-chats"); document.body.classList.toggle("show-docs"); });
+$("toggle-chats").addEventListener("click", () => { document.body.classList.remove("show-docs"); document.body.classList.toggle("show-chats"); });
+$("scrim").addEventListener("click", closeDrawers);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawers(); });
+const isDrawer = (id) => getComputedStyle($(id)).position === "fixed";
+
+// ---------------- chats (history) ----------------
+let activeChat = null;   // conversation_id, or null for a new chat not yet saved
+let chatList = [];
+
+async function loadChats() {
+  chatList = await api("/conversations");
+  renderChatList();
 }
 
-// ---- preview ----
+function renderChatList() {
+  const list = $("chats");
+  list.replaceChildren();
+  if (!chatList.length) { list.append(el("li", { class: "muted-note" }, "Your chats will be listed here.")); return; }
+  for (const c of chatList) {
+    const open = el("button", { type: "button", class: "chat-open", title: c.title },
+      el("span", { class: "chat-title" }, c.title),
+      el("span", { class: "chat-when" }, whenLabel(c.updated_at)));
+    open.addEventListener("click", () => { openChat(c.conversation_id); if (isDrawer("sidebar")) closeDrawers(); });
+    const rename = iconButton("rename", `Rename "${c.title}"`);
+    rename.addEventListener("click", () => renameChat(c));
+    const del = iconButton("trash", `Delete "${c.title}"`, "danger");
+    del.addEventListener("click", () => deleteChat(c));
+    list.append(el("li", { class: `chat-item${c.conversation_id === activeChat ? " active" : ""}` },
+      open, el("span", { class: "chat-actions" }, rename, del)));
+  }
+}
+
+function showWelcome() {
+  const hasDocs = Object.keys(docNames).length > 0;
+  $("thread").replaceChildren(el("div", { class: "welcome" },
+    el("h2", {}, "Ask about your documents"),
+    el("p", {}, hasDocs
+      ? "Ask a question and follow up on it. Every answer shows how far to trust it and which pages it came from."
+      : "Start by uploading a document in the Documents panel, then ask a question here.")));
+}
+
+function newChat() {
+  activeChat = null;
+  store.set("docblend.chat", null);
+  showWelcome();
+  renderChatList();
+  $("question").focus();
+}
+
+async function openChat(id) {
+  try {
+    const chat = await api(`/conversations/${id}`);
+    activeChat = id;
+    store.set("docblend.chat", id);
+    const thread = $("thread");
+    thread.replaceChildren();
+    if (!chat.turns.length) showWelcome();
+    for (const t of chat.turns) thread.append(userMessage(t.question_text), botMessage(t.answer, t.sources));
+    renderChatList();
+    scrollToEnd();
+  } catch (err) {
+    if (/not found/i.test(err.message)) { newChat(); await loadChats(); } else throw err;
+  }
+}
+
+async function renameChat(c) {
+  const title = prompt("Rename chat", c.title);
+  if (!title || !title.trim() || title.trim() === c.title) return;
+  await api(`/conversations/${c.conversation_id}`, json("PATCH", { title: title.trim() }));
+  await loadChats();
+}
+
+async function deleteChat(c) {
+  if (!confirm(`Delete the chat "${c.title}" and its answers?`)) return;
+  await api(`/conversations/${c.conversation_id}`, { method: "DELETE" });
+  if (c.conversation_id === activeChat) newChat();
+  await loadChats();
+}
+
+$("new-chat").addEventListener("click", () => { newChat(); if (isDrawer("sidebar")) closeDrawers(); });
+
+// ---------------- messages ----------------
+function userMessage(text) { return el("div", { class: "msg-user" }, text); }
+
+function meter(label, v) {
+  const pct = Math.round(v * 100);
+  return el("span", { class: "meter", title: `${label} ${pct}%` }, label, el("i", {}, el("b", { style: `width:${pct}%` })), el("em", {}, `${pct}%`));
+}
+
+function citation(s, n) {
+  const where = el("div", { class: "cite-where" }, el("b", {}, docLabel(s.doc_id)));
+  if (s.page) {
+    let text = `Page ${s.page}`;
+    if (s.first_line) text += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
+    const link = el("button", { class: "cite-page", type: "button", title: "Show this page" }, text);
+    link.addEventListener("click", () => openPreview(s.doc_id, s.page, true).catch((err) => alert(err.message)));
+    where.append(" · ", link);
+  }
+  return el("li", { class: "cite" },
+    el("span", { class: "cite-n" }, `${n}.`),
+    where,
+    el("div", { class: "scores" }, meter("Match", s.similarity), meter("Readability", s.confidence)),
+    el("details", {}, el("summary", {}, "Show passage"), el("blockquote", {}, s.text)));
+}
+
+function botMessage(answer, sources) {
+  const label = answer.reliability_label;
+  const node = el("div", { class: "msg-bot" },
+    el("div", { class: "top" }, el("span", { class: "who" }, "DocBlendAI"), el("span", { class: `tag ${label}` }, label)),
+    renderAnswer(answer.answer_text),
+    el("p", { class: "why" }, WHY[label]));
+  if (sources.length) {
+    const list = el("ol", {});
+    sources.forEach((s, i) => list.append(citation(s, i + 1)));
+    node.append(el("details", { class: "sources" }, el("summary", {}, `Sources (${sources.length})`), list));
+  }
+  return node;
+}
+
+function scrollToEnd() { const m = $("messages"); m.scrollTop = m.scrollHeight; }
+
+const question = $("question");
+function fitComposer() { question.style.height = "auto"; question.style.height = `${Math.min(question.scrollHeight, 180)}px`; }
+question.addEventListener("input", fitComposer);
+question.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask-form").requestSubmit(); }
+});
+
+$("ask-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = question.value.trim();
+  if (!text) return;
+  const btn = $("ask-btn");
+  btn.disabled = true;
+  const thread = $("thread");
+  thread.querySelector(".welcome")?.remove();
+  const pending = el("div", { class: "msg-bot pending" }, el("div", { class: "body" }, el("span", { class: "dots" }, "Reading your documents")));
+  thread.append(userMessage(text), pending);
+  question.value = ""; fitComposer();
+  scrollToEnd();
+  try {
+    if (!activeChat) {
+      activeChat = (await api("/conversations", json("POST", {}))).conversation_id;
+      store.set("docblend.chat", activeChat);
+    }
+    const turn = await api(`/conversations/${activeChat}/messages`, json("POST", { question_text: text }));
+    pending.replaceWith(botMessage(turn.answer, turn.sources));
+    await loadChats();
+  } catch (err) {
+    pending.className = "msg-bot failed";
+    pending.replaceChildren(el("div", { class: "body" }, err.message));
+    if (!question.value) { question.value = text; fitComposer(); }  // keep the question so it can be re-sent
+  } finally {
+    btn.disabled = false; question.focus(); scrollToEnd();
+  }
+});
+
+// ---------------- documents ----------------
 const view = { docId: null, page: 1, info: null };
 const previewCache = {};
 
-async function openPreview(docId, page = 1) {
+async function openPreview(docId, page = 1, reveal = false) {
   if (!previewCache[docId]) previewCache[docId] = await api(`/documents/${docId}/preview`);
   view.docId = docId; view.info = previewCache[docId];
   view.page = Math.min(Math.max(1, page), view.info.page_count || 1);
   renderPreview();
   document.querySelectorAll(".doc").forEach((li) => li.classList.toggle("selected", li.dataset.id === docId));
+  if (reveal) {
+    if (isDrawer("docs-panel")) { document.body.classList.remove("show-chats"); document.body.classList.add("show-docs"); }
+    $("preview").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function renderPreview() {
@@ -354,12 +591,14 @@ function renderPreview() {
     open.href = src; open.hidden = false;
   }
 }
-
-function closePreview() { view.docId = null; $("preview").hidden = true; }
+function closePreview() {
+  view.docId = null; $("preview").hidden = true;
+  document.querySelectorAll(".doc.selected").forEach((li) => li.classList.remove("selected"));
+}
 $("prev-page").addEventListener("click", () => { view.page--; renderPreview(); });
 $("next-page").addEventListener("click", () => { view.page++; renderPreview(); });
+$("close-preview").addEventListener("click", closePreview);
 
-// ---- documents ----
 async function deleteDoc(d, button) {
   if (!confirm(`Remove "${docLabel(d.doc_id)}"? It is removed from DocBlendAI only; your original file is not touched.`)) return;
   button.disabled = true;
@@ -379,8 +618,9 @@ async function loadDocs() {
   const list = $("docs");
   const docs = await api("/documents");
   list.replaceChildren();
+  for (const k of Object.keys(docNames)) delete docNames[k];
   $("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
-  if (!docs.length) { list.append(el("li", { class: "empty" }, "No documents yet. Upload one to begin.")); return; }
+  if (!docs.length) list.append(el("li", { class: "muted-note" }, "No documents yet."));
   for (const d of docs) {
     const name = nameFromPath(d);
     docNames[d.doc_id] = name;
@@ -390,22 +630,19 @@ async function loadDocs() {
         el("span", { class: "doc-name" }, name),
         el("span", { class: "doc-meta" }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)));
     open.addEventListener("click", () => openPreview(d.doc_id).catch((err) => setStatus("upload-status", err.message, "error")));
-    const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
+    const remove = iconButton("trash", `Remove ${name}`, "danger");
     remove.addEventListener("click", () => deleteDoc(d, remove));
     const li = el("li", { class: `doc${view.docId === d.doc_id ? " selected" : ""}` }, open, remove);
     li.dataset.id = d.doc_id;
     list.append(li);
   }
+  if ($("thread").querySelector(".welcome")) showWelcome();  // the hint depends on whether documents exist
 }
 
-// ---- upload: click the box, or drop a file anywhere on the page ----
+// Upload: click the box, or drop a file anywhere on the page (instead of the browser opening it).
 const fileInput = $("file"), drop = $("drop");
-function showChosen() {
-  const f = fileInput.files[0];
-  $("chosen").textContent = f ? `Selected: ${f.name}` : "";
-}
+function showChosen() { const f = fileInput.files[0]; $("chosen").textContent = f ? `Selected: ${f.name}` : ""; }
 fileInput.addEventListener("change", showChosen);
-// A file dropped anywhere goes to the upload box (instead of the browser opening it and leaving the app).
 const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
 window.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); drop.classList.add("dragging"); } });
 window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) drop.classList.remove("dragging"); });
@@ -417,7 +654,7 @@ window.addEventListener("drop", (e) => {
     fileInput.files = e.dataTransfer.files;
     showChosen();
     setStatus("upload-status", "File ready. Press Upload.");
-    drop.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (isDrawer("docs-panel")) { document.body.classList.remove("show-chats"); document.body.classList.add("show-docs"); }
   }
 });
 
@@ -435,11 +672,8 @@ $("upload-form").addEventListener("submit", async (e) => {
   try {
     const { body: doc, status: code } = await api("/upload", { method: "POST", body: form }, true);
     await loadDocs();
-    if (code === 200) {
-      setStatus("upload-status", `Already uploaded as ${docLabel(doc.doc_id)}, so it was not added again.`);
-    } else {
-      setStatus("upload-status", `Added: ${FORMAT_LABEL[doc.format_type].toLowerCase()}, ${pages(doc.page_count)}.`, "ok");
-    }
+    if (code === 200) setStatus("upload-status", `Already uploaded as ${docLabel(doc.doc_id)}, so it was not added again.`);
+    else setStatus("upload-status", `Added: ${FORMAT_LABEL[doc.format_type].toLowerCase()}, ${pages(doc.page_count)}.`, "ok");
     e.target.reset(); showChosen();
     openPreview(doc.doc_id).catch(() => {});
   } catch (err) {
@@ -447,70 +681,19 @@ $("upload-form").addEventListener("submit", async (e) => {
   } finally { btn.disabled = false; btn.textContent = "Upload"; }
 });
 
-// ---- answers ----
-function meter(label, v) {
-  const pct = Math.round(v * 100);
-  const bar = el("i", {}, el("b", { style: `width:${pct}%` }));
-  return el("span", { class: "meter", title: `${label} ${pct}%` }, label, bar, el("em", {}, `${pct}%`));
-}
-
-function citation(s, n) {
-  const where = el("div", { class: "cite-where" }, el("b", {}, docLabel(s.doc_id)));
-  if (s.page) {
-    let text = `Page ${s.page}`;
-    if (s.first_line) text += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
-    const link = el("button", { class: "cite-page", type: "button", title: "Show this page in the preview" }, text);
-    link.addEventListener("click", () => openPreview(s.doc_id, s.page)
-      .then(() => $("preview").scrollIntoView({ behavior: "smooth", block: "start" }))
-      .catch((err) => setStatus("ask-status", err.message, "error")));
-    where.append(" · ", link);
-  }
-  return el("li", { class: "cite" },
-    el("span", { class: "cite-n" }, `${n}.`),
-    where,
-    el("div", { class: "scores" }, meter("Match", s.similarity), meter("Readability", s.confidence)),
-    el("details", {}, el("summary", {}, "Show passage"), el("blockquote", {}, s.text)));
-}
-
-const question = $("question");
-question.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask-form").requestSubmit(); }
-});
-
-$("ask-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = question.value.trim();
-  if (!text) return;
-  const btn = $("ask-btn");
-  btn.disabled = true; btn.textContent = "Thinking…";
-  setStatus("ask-status", "");
+// ---------------- start ----------------
+(async () => {
   try {
-    const answer = await api("/ask", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query_id: crypto.randomUUID(), question_text: text, user_id: "web" }),
-    });
-    const sources = await api(`/answer/${answer.answer_id}/sources`);
-    const label = answer.reliability_label;
-    const card = el("article", { class: "answer" },
-      el("div", { class: "answer-top" },
-        el("h3", { class: "q" }, text),
-        el("span", { class: `tag ${label}` }, label)),
-      renderAnswer(answer.answer_text),
-      el("p", { class: "why" }, WHY[label]));
-    if (sources.length) {
-      const list = el("ol", {});
-      sources.forEach((s, i) => list.append(citation(s, i + 1)));
-      card.append(el("div", { class: "sources" }, el("h3", {}, "Sources"), list));
-    }
-    $("no-answers")?.remove();
-    $("answers").prepend(card);
-    question.value = "";
+    await loadDocs();
+    await loadChats();
+    const last = store.get("docblend.chat");
+    if (last && chatList.some((c) => c.conversation_id === last)) await openChat(last);
+    else newChat();
   } catch (err) {
-    setStatus("ask-status", err.message, "error");
-  } finally { btn.disabled = false; btn.textContent = "Ask"; question.focus(); }
-});
-
-loadDocs().catch((err) => setStatus("upload-status", err.message, "error"));
+    showWelcome();
+    $("thread").append(el("div", { class: "msg-bot failed" }, el("div", { class: "body" }, err.message)));
+  }
+})();
 </script>
 </body>
 </html>
