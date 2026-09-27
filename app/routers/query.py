@@ -7,8 +7,10 @@ Uses from schemas.py: Query, Answer.
 """
 
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -133,3 +135,36 @@ def sources_for_query(query_id: str, db: Session) -> list[AnswerSource]:
             )
         )
     return sources
+
+
+# --- chat: a question plus the recent turns of the current conversation --------------------------
+# Nothing about the conversation is saved: the page keeps its own turns and sends the last few,
+# so follow-ups ("explain that in more detail") can be understood. Each question is still stored
+# as the usual Query / Answer / RetrievalResult rows, exactly like /ask.
+
+
+class ChatTurn(BaseModel):
+    question: str
+    answer: str
+
+
+class ChatRequest(BaseModel):
+    question_text: str = Field(min_length=1)
+    history: list[ChatTurn] = Field(default_factory=list, description="Earlier turns, oldest first")
+
+
+class ChatReply(BaseModel):
+    answer: Answer
+    sources: list[AnswerSource]
+
+
+CHAT_USER = "web"  # the demo has no accounts
+CHAT_CONTEXT_TURNS = 3
+
+
+@router.post("/chat", response_model=ChatReply)
+def chat(body: ChatRequest, db: Session = Depends(get_db)) -> ChatReply:
+    query = Query(query_id=uuid.uuid4().hex, question_text=body.question_text.strip(), user_id=CHAT_USER)
+    history = [(t.question, t.answer) for t in body.history[-CHAT_CONTEXT_TURNS:]]
+    answer = answer_and_store(query, db, history=history)
+    return ChatReply(answer=answer, sources=sources_for_query(query.query_id, db))

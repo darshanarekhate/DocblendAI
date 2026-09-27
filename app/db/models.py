@@ -5,10 +5,8 @@ Answer, and RetrievalResult. RecognizedChunk is not stored here: it lives in
 ChromaDB (Module 5, vector_store.py).
 """
 
-from datetime import datetime
-
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -54,28 +52,3 @@ class RetrievalResultORM(Base):
     confidence: Mapped[float] = mapped_column(Float)
     combined_score: Mapped[float] = mapped_column(Float)
 
-
-# --- Chat history (API/UI feature, not synopsis entities) -------------------------------------
-# New tables only: create_all adds them to an existing database without touching the tables above.
-
-
-class ConversationORM(Base):
-    """A chat: an ordered series of questions (Query rows) about the uploaded documents."""
-
-    __tablename__ = "conversations"
-
-    conversation_id: Mapped[str] = mapped_column(String, primary_key=True)
-    title: Mapped[str] = mapped_column(String)
-    created_at: Mapped[datetime] = mapped_column(DateTime)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, index=True)
-
-
-class ConversationTurnORM(Base):
-    """One question in a chat; the answer and sources hang off its query_id as usual."""
-
-    __tablename__ = "conversation_turns"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.conversation_id"), index=True)
-    query_id: Mapped[str] = mapped_column(ForeignKey("queries.query_id"), unique=True)
-    asked_at: Mapped[datetime] = mapped_column(DateTime)
