@@ -44,3 +44,12 @@ def test_docx_preview_is_text_per_page(client, tmp_path) -> None:
 def test_preview_unknown_document_is_404(client) -> None:
     assert client.get("/documents/nope/preview").status_code == 404
     assert client.get("/documents/nope/pages/1").status_code == 404
+
+
+def test_local_pages_opened_outside_the_server_may_call_the_api(client) -> None:
+    """index.html opened as a file (origin "null") or from a localhost live preview works;
+    other websites are not allowed to call the local API."""
+    for origin in ("null", "http://127.0.0.1:5500", "http://localhost:3000"):
+        resp = client.get("/health", headers={"Origin": origin})
+        assert resp.headers.get("access-control-allow-origin") == origin
+    assert "access-control-allow-origin" not in client.get("/health", headers={"Origin": "https://evil.example"}).headers
