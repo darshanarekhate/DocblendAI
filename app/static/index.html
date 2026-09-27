@@ -6,587 +6,619 @@
 <title>DocBlendAI</title>
 <link rel="icon" href="data:,">
 <style>
+  /* ================= Palette & tokens ================= */
   :root {
     color-scheme: light;
-    --bg: #f7f4ee;          /* warm off-white */
-    --surface: #fffdfa;
-    --sunk: #f2eee6;
-    --ink: #1e2b3c;         /* dark navy text */
-    --heading: #1b2a41;
-    --muted: #5f6b7a;
-    --faint: #8a929c;
-    --line: #e2ddd3;
-    --line-strong: #cfc8bb;
-    --blue: #4b6a8c;        /* muted blue: buttons, links, active items */
-    --blue-hover: #3e5a78;
-    --blue-soft: #e8eef4;
-    --green: #5a8f6e;       /* soft green: confidence scores */
-    --green-bg: #e6f0e8;
-    --certain: #3f7a55;    --certain-bg: #e6f0e8;
-    --moderate: #8a6420;   --moderate-bg: #f4ecdb;
-    --uncertain: #56606d;  --uncertain-bg: #eceef0;
-    --unreadable: #9a3b34; --unreadable-bg: #f4e4e1;
-    --error: #9a3b34;
-    --radius: 6px;
-    --header-h: 56px;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    /* neutrals */
+    --page: #f7f5f0;        /* warm off-white page */
+    --card: #ffffff;
+    --subtle: #f3f1ec;      /* inputs, hover, quotes */
+    --border: #e6e1d8;
+    --border-strong: #d3ccc0;
+    --text: #1e293b;        /* navy ink */
+    --text-muted: #64748b;
+    --text-faint: #94a3b8;
+    /* one accent */
+    --primary: #2e5e8c;     /* muted blue */
+    --primary-hover: #244b70;
+    --primary-tint: #eaf1f8;
+    /* reliability (and scores) only */
+    --green: #3d7a57;  --green-tint: #e8f3ec;
+    --amber: #9a6700;  --amber-tint: #fbf1dc;
+    --slate: #475569;  --slate-tint: #eef1f5;
+    --red: #b42318;    --red-tint: #fdecea;
+    /* shape & type */
+    --r-card: 10px;
+    --r-control: 7px;
+    --shadow: 0 1px 2px rgba(30, 41, 59, 0.05);
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   }
 
+  /* ================= Base ================= */
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15.5px/1.6 var(--sans); overflow: hidden; }
-  h1, h2, h3 { color: var(--heading); margin: 0; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 15px/1.6 var(--font); }
+  h1, h2, h3, p { margin: 0; }
   button, input, select, textarea { font: inherit; color: inherit; }
-  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   [hidden] { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  /* ---------- app frame: header + three independently scrolling columns ---------- */
-  header { height: var(--header-h); display: flex; align-items: center; gap: 12px; padding: 0 18px;
-           background: var(--surface); border-bottom: 1px solid var(--line); }
-  header h1 { font-family: var(--serif); font-size: 21px; font-weight: 600; }
-  header .tagline { font-size: 13.5px; color: var(--muted); }
-  header .spacer { flex: 1; }
-  .panel-toggle { display: none; }
-  .app { height: calc(100% - var(--header-h)); display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
-  .docs-panel { overflow-y: auto; background: var(--surface); }
-  .docs-panel { border-left: 1px solid var(--line); padding: 16px; display: grid; gap: 22px; align-content: start; }
-  .chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  /* ================= Controls ================= */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 16px;
+         border: 1px solid var(--primary); border-radius: var(--r-control); background: var(--primary); color: #fff;
+         font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .btn:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn.secondary { background: var(--card); color: var(--text); border-color: var(--border-strong); font-weight: 500; }
+  .btn.secondary:hover:not(:disabled) { background: var(--subtle); border-color: var(--border-strong); }
+  .btn.small { height: 32px; padding: 0 12px; font-size: 14px; }
+  .icon-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 6px;
+              background: none; color: var(--text-faint); cursor: pointer; flex: none; }
+  .icon-btn:hover { background: var(--subtle); color: var(--text); }
+  .icon-btn.remove:hover { background: var(--red-tint); color: var(--red); }
+  select { height: 38px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--r-control); background: var(--card); }
 
-  /* ---------- buttons & fields ---------- */
-  .btn { border: 1px solid var(--blue); border-radius: var(--radius); background: var(--blue); color: #fff;
-         padding: 8px 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
-  .btn:hover:not(:disabled) { background: var(--blue-hover); border-color: var(--blue-hover); }
-  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-  .btn-outline { border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface);
-                 padding: 7px 12px; font-size: 14px; cursor: pointer; }
-  .btn-outline:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
-  .btn-outline:disabled { opacity: 0.4; cursor: default; }
-  .icon-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 4px;
-              background: none; color: var(--faint); cursor: pointer; }
-  .icon-btn:hover { background: var(--sunk); color: var(--ink); }
-  .icon-btn.danger:hover { color: var(--error); }
-  select, textarea { width: 100%; background: var(--surface); border: 1px solid var(--line-strong);
-                     border-radius: var(--radius); padding: 8px 10px; }
-  .section-title { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 10px; }
-  .section-title h2 { font-size: 15px; font-weight: 600; }
-  .section-title span { font-size: 12.5px; color: var(--muted); }
-  .status { font-size: 13.5px; color: var(--muted); margin: 8px 0 0; }
-  .status:empty { display: none; }
-  .status.error { color: var(--error); }
-  .status.ok { color: var(--certain); }
+  /* ================= Layout ================= */
+  .topbar { height: 58px; display: flex; align-items: center; gap: 14px; padding: 0 24px; background: var(--card);
+            border-bottom: 1px solid var(--border); }
+  .brand { font-size: 19px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+  .brand span { color: var(--primary); }
+  .tagline { color: var(--text-muted); font-size: 14px; }
+  .topbar .spacer { flex: 1; }
+  .tabs { display: none; }
 
-  .muted-note { font-size: 13.5px; color: var(--muted); margin: 4px 0; }
+  .layout { height: calc(100% - 58px); display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 20px;
+            padding: 20px 24px; max-width: 1320px; margin: 0 auto; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r-card); box-shadow: var(--shadow);
+          min-height: 0; min-width: 0; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 18px;
+               border-bottom: 1px solid var(--border); }
+  .card-head h2 { font-size: 15px; font-weight: 600; }
+  .card-head .count { font-size: 13px; color: var(--text-muted); }
 
-  /* ---------- chat column ---------- */
-  .messages { flex: 1; overflow-y: auto; padding: 24px 28px 12px; }
-  .messages-inner { max-width: 780px; margin: 0 auto; display: grid; gap: 18px; }
-  .welcome { max-width: 520px; margin: 12vh auto 0; text-align: center; }
-  .welcome h2 { font-family: var(--serif); font-size: 24px; font-weight: 600; margin-bottom: 6px; }
-  .welcome p { margin: 0; color: var(--muted); }
-  .msg-user { justify-self: end; max-width: 78%; padding: 10px 14px; border-radius: 10px 10px 2px 10px;
-              background: var(--blue-soft); color: var(--heading); white-space: pre-wrap; }
-  .msg-bot { justify-self: stretch; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line);
-             border-radius: 10px 10px 10px 2px; }
-  .msg-bot .top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-  .msg-bot .who { font-size: 13px; font-weight: 600; color: var(--muted); }
-  .msg-bot .body p { margin: 0 0 10px; }
-  .msg-bot .body p:last-child { margin-bottom: 0; }
-  .msg-bot .body ul, .msg-bot .body ol { margin: 0 0 10px; padding-left: 22px; }
-  .msg-bot .why { margin: 10px 0 0; font-size: 13.5px; color: var(--muted); }
-  .msg-bot.pending .body { color: var(--muted); }
-  .msg-bot.failed { border-color: #e7c9c4; }
-  .msg-bot.failed .body { color: var(--error); }
-  .dots::after { content: "…"; display: inline-block; width: 1.2em; animation: dots 1.2s steps(4) infinite; overflow: hidden;
-                 vertical-align: bottom; }
-  @keyframes dots { 0% { width: 0; } 100% { width: 1.2em; } }
+  /* ================= Documents ================= */
+  .docs { display: flex; flex-direction: column; }
+  .upload { padding: 16px 18px; border-bottom: 1px solid var(--border); }
+  .drop { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 18px 12px; text-align: center;
+          border: 1.5px dashed var(--border-strong); border-radius: var(--r-control); background: var(--subtle); cursor: pointer;
+          transition: border-color .12s, background-color .12s; }
+  .drop:hover, .drop.dragging { border-color: var(--primary); background: var(--primary-tint); }
+  .drop svg { color: var(--primary); margin-bottom: 4px; }
+  .drop strong { font-size: 14.5px; font-weight: 600; }
+  .drop small { font-size: 12.5px; color: var(--text-muted); }
+  .drop .chosen { margin-top: 6px; font-size: 13.5px; font-weight: 600; color: var(--primary); word-break: break-all; }
+  .upload-row { display: flex; gap: 8px; margin-top: 10px; }
+  .upload-row select { flex: 1; min-width: 0; }
+  .notice { margin-top: 10px; font-size: 13.5px; color: var(--text-muted); }
+  .notice:empty { display: none; }
+  .notice.ok { color: var(--green); }
+  .notice.error { color: var(--red); }
 
-  .tag { padding: 1px 9px; border-radius: 4px; font-size: 12.5px; font-weight: 600; color: var(--tier); background: var(--tier-bg); }
-  .Certain { --tier: var(--certain); --tier-bg: var(--certain-bg); }
-  .Moderate { --tier: var(--moderate); --tier-bg: var(--moderate-bg); }
-  .Uncertain { --tier: var(--uncertain); --tier-bg: var(--uncertain-bg); }
-  .Unreadable { --tier: var(--unreadable); --tier-bg: var(--unreadable-bg); }
+  .doc-list { list-style: none; margin: 0; padding: 8px; overflow-y: auto; flex: 1; }
+  .doc { display: flex; align-items: center; gap: 4px; border-radius: var(--r-control); }
+  .doc:hover { background: var(--subtle); }
+  .doc-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 8px 10px;
+              border: 0; background: none; text-align: left; cursor: pointer; border-radius: var(--r-control); }
+  .ftype { flex: none; width: 42px; padding: 3px 0; border-radius: 5px; text-align: center; font-size: 10.5px; font-weight: 700;
+           letter-spacing: .04em; color: var(--primary); background: var(--primary-tint); }
+  .doc-text { min-width: 0; }
+  .doc-name { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-meta { display: block; font-size: 12.5px; color: var(--text-muted); }
+  .empty { padding: 18px 12px; text-align: center; font-size: 14px; color: var(--text-muted); }
 
-  .sources { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
-  .sources > summary { cursor: pointer; font-size: 13.5px; color: var(--blue); }
-  .sources ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
-  .cite { display: grid; grid-template-columns: 24px minmax(0, 1fr); font-size: 14px; }
-  .cite-n { grid-row: span 3; color: var(--faint); font-weight: 600; }
-  .cite-where { overflow-wrap: anywhere; }
-  .cite-where b { font-weight: 600; }
-  .cite-page { background: none; border: 0; padding: 0; color: var(--blue); cursor: pointer; white-space: nowrap;
+  /* ================= Chat ================= */
+  .chat { display: flex; flex-direction: column; }
+  .messages { flex: 1; overflow-y: auto; padding: 22px 24px; }
+  .thread { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .welcome { margin: 10vh auto 0; max-width: 460px; text-align: center; }
+  .welcome h3 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .welcome p { color: var(--text-muted); }
+
+  .bubble-user { align-self: flex-end; max-width: 80%; padding: 10px 14px; border-radius: 12px 12px 4px 12px;
+                 background: var(--primary); color: #fff; white-space: pre-wrap; }
+  .bubble-bot { align-self: stretch; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px 12px 12px 4px;
+                background: var(--card); }
+  .bubble-bot .meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .bubble-bot .who { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+  .answer p { margin-bottom: 8px; }
+  .answer p:last-child { margin-bottom: 0; }
+  .answer ul, .answer ol { margin: 0 0 8px; padding-left: 22px; }
+  .why { margin-top: 8px; font-size: 13.5px; color: var(--text-muted); }
+  .bubble-bot.pending { color: var(--text-muted); }
+  .bubble-bot.failed { border-color: #f1c7c2; background: var(--red-tint); color: var(--red); }
+  .dots::after { content: "…"; display: inline-block; overflow: hidden; vertical-align: bottom; width: 0;
+                 animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { to { width: 1.2em; } }
+
+  .label { padding: 1px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--tone); background: var(--tint); }
+  .Certain { --tone: var(--green); --tint: var(--green-tint); }
+  .Moderate { --tone: var(--amber); --tint: var(--amber-tint); }
+  .Uncertain { --tone: var(--slate); --tint: var(--slate-tint); }
+  .Unreadable { --tone: var(--red); --tint: var(--red-tint); }
+
+  .sources { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .sources > summary { cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--primary); }
+  .source-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .source { display: grid; grid-template-columns: 22px minmax(0, 1fr); font-size: 14px; }
+  .source .n { grid-row: span 3; color: var(--text-faint); font-weight: 600; }
+  .source .where { overflow-wrap: anywhere; }
+  .source .where b { font-weight: 600; }
+  .page-link { border: 0; background: none; padding: 0; color: var(--primary); cursor: pointer; white-space: nowrap;
                text-decoration: underline; text-underline-offset: 2px; }
-  .scores { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 2px; font-size: 13px; color: var(--muted); }
+  .scores { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 2px; font-size: 12.5px; color: var(--text-muted); }
   .meter { display: inline-flex; align-items: center; gap: 6px; }
-  .meter i { display: inline-block; width: 52px; height: 5px; border-radius: 3px; background: var(--green-bg); overflow: hidden; }
+  .meter i { width: 50px; height: 5px; border-radius: 3px; background: var(--green-tint); overflow: hidden; }
   .meter i b { display: block; height: 100%; background: var(--green); }
   .meter em { font-style: normal; font-weight: 600; color: var(--green); }
-  .cite details summary { cursor: pointer; font-size: 13px; color: var(--blue); }
-  .cite blockquote { margin: 6px 0 0; padding: 8px 12px; border-left: 3px solid var(--line-strong); background: var(--sunk);
-                     border-radius: 0 4px 4px 0; white-space: pre-wrap; max-height: 180px; overflow: auto; font-size: 13.5px; }
+  .source details summary { cursor: pointer; font-size: 13px; color: var(--primary); }
+  .source blockquote { margin: 6px 0 0; padding: 8px 12px; border-left: 3px solid var(--border-strong); border-radius: 0 6px 6px 0;
+                       background: var(--subtle); font-size: 13.5px; white-space: pre-wrap; max-height: 170px; overflow: auto; }
 
-  .composer { border-top: 1px solid var(--line); background: var(--bg); padding: 12px 28px 16px; }
-  .composer form { max-width: 780px; margin: 0 auto; display: flex; gap: 10px; align-items: end;
-                   background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 8px 8px 14px; }
-  .composer form:focus-within { border-color: var(--blue); }
-  .composer textarea { border: 0; padding: 6px 0; resize: none; min-height: 24px; max-height: 180px; line-height: 1.5;
-                       background: transparent; font-size: 15.5px; }
+  .composer { padding: 14px 24px 16px; border-top: 1px solid var(--border); }
+  .composer form { max-width: 760px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 14px;
+                   border: 1px solid var(--border-strong); border-radius: 12px; background: var(--card); }
+  .composer form:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-tint); }
+  .composer textarea { flex: 1; min-height: 26px; max-height: 160px; padding: 6px 0; border: 0; resize: none; background: none;
+                       line-height: 1.5; font-size: 15px; }
   .composer textarea:focus-visible { outline: none; }
-  .composer .hint { max-width: 780px; margin: 6px auto 0; font-size: 12.5px; color: var(--faint); }
+  .composer .hint { max-width: 760px; margin: 6px auto 0; font-size: 12.5px; color: var(--text-faint); }
 
-  /* ---------- documents panel ---------- */
-  .drop { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 12px; text-align: center;
-          border: 1.5px dashed var(--line-strong); border-radius: var(--radius); background: var(--sunk); cursor: pointer; }
-  .drop:hover, .drop.dragging { border-color: var(--blue); background: var(--blue-soft); }
-  .drop svg { color: var(--blue); margin-bottom: 4px; }
-  .drop strong { font-size: 14.5px; font-weight: 600; }
-  .drop small { font-size: 12.5px; color: var(--muted); }
-  .drop .chosen { margin-top: 6px; font-size: 13.5px; font-weight: 600; color: var(--blue); word-break: break-all; }
-  .upload-row { display: flex; gap: 8px; margin-top: 10px; }
-  .upload-row select { flex: 1; min-width: 0; font-size: 14px; }
+  /* ================= Preview window ================= */
+  dialog.preview { width: min(760px, calc(100% - 32px)); max-height: calc(100% - 48px); padding: 0; border: 1px solid var(--border);
+                   border-radius: var(--r-card); background: var(--card); color: var(--text); box-shadow: 0 12px 32px rgba(30, 41, 59, .18); }
+  dialog.preview::backdrop { background: rgba(30, 41, 59, .35); }
+  .preview-inner { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
+  .preview-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--border); }
+  .preview-head h2 { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preview-body { overflow: auto; background: var(--subtle); padding: 16px; }
+  .preview-body img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+  .preview-body pre { margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: 6px; background: #fff;
+                      font: 14px/1.65 var(--font); white-space: pre-wrap; }
+  .preview-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px;
+                  border-top: 1px solid var(--border); }
+  .preview-foot .where { font-size: 13.5px; color: var(--text-muted); }
+  .preview-foot a { font-size: 13px; color: var(--primary); }
 
-  ul.docs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
-  .doc { display: flex; align-items: center; gap: 4px; padding: 7px 6px 7px 8px; border: 1px solid var(--line);
-         border-radius: var(--radius); background: var(--surface); }
-  .doc:hover { border-color: var(--line-strong); }
-  .doc.selected { border-color: var(--blue); background: var(--blue-soft); }
-  .doc-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; background: none; border: 0;
-              padding: 0; text-align: left; cursor: pointer; }
-  .ftype { flex: none; width: 40px; padding: 2px 0; text-align: center; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
-           color: var(--blue); background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; }
-  .doc-info { min-width: 0; }
-  .doc-name { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .doc-meta { display: block; font-size: 12.5px; color: var(--muted); }
-
-  .preview-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-  .preview-nav .where { font-size: 13.5px; color: var(--muted); }
-  .preview-name { font-size: 13.5px; font-weight: 600; margin: -4px 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .preview-page { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; overflow: auto; max-height: 520px; }
-  .preview-page img { display: block; width: 100%; height: auto; }
-  .preview-page pre { margin: 0; padding: 12px; font: 13.5px/1.6 var(--sans); white-space: pre-wrap; }
-  .preview-open { display: inline-block; margin-top: 6px; font-size: 13px; color: var(--blue); }
-
-  /* ---------- responsive: side panels become drawers ---------- */
-  .scrim { display: none; }
-  @media (max-width: 1180px) {
-    .app { grid-template-columns: minmax(0, 1fr); }
-    .docs-panel { position: fixed; top: var(--header-h); right: 0; bottom: 0; width: min(380px, 92vw); z-index: 20;
-                  transform: translateX(100%); transition: transform .18s ease; box-shadow: -1px 0 0 var(--line); }
-    body.show-docs .docs-panel { transform: none; }
-    .panel-toggle.docs { display: inline-flex; }
-  }
-  @media (max-width: 760px) {
-    header .tagline { display: none; }
-    .messages { padding: 16px 14px 8px; }
+  /* ================= Small screens: Chat | Documents tabs ================= */
+  @media (max-width: 860px) {
+    .tagline { display: none; }
+    .topbar { padding: 0 12px; gap: 8px; }
+    .brand { font-size: 17px; }
+    .topbar .spacer { display: none; }
+    .tabs { margin-left: auto; }
+    #new-chat { padding: 0 10px; }
+    .tabs { display: flex; gap: 4px; padding: 3px; border-radius: 9px; background: var(--subtle); }
+    .tabs button { height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: none; font-size: 14px; font-weight: 500;
+                   color: var(--text-muted); cursor: pointer; }
+    .tabs button[aria-selected="true"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+    .layout { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+    body[data-tab="chat"] .docs, body[data-tab="docs"] .chat { display: none; }
+    .messages { padding: 16px 14px; }
     .composer { padding: 10px 12px 12px; }
-    .msg-user { max-width: 90%; }
-  }
-  @media (max-width: 1180px) {
-    body.show-docs .scrim { display: block; position: fixed; inset: var(--header-h) 0 0 0;
-                                                    background: rgba(30, 43, 60, 0.25); z-index: 10; }
+    .bubble-user { max-width: 90%; }
   }
 </style>
 </head>
-<body>
-<header>
-  <h1>DocBlendAI</h1>
-  <span class="tagline">Question answering over typed, scanned and handwritten notes</span>
+<body data-tab="chat">
+
+<header class="topbar">
+  <span class="brand">Doc<span>Blend</span>AI</span>
+  <span class="tagline">Ask questions about typed, scanned and handwritten notes</span>
   <span class="spacer"></span>
-  <button type="button" class="btn-outline" id="new-chat" title="Clear this conversation and start again">New chat</button>
-  <button type="button" class="btn-outline panel-toggle docs" id="toggle-docs" aria-controls="docs-panel">Documents</button>
+  <nav class="tabs" role="tablist" aria-label="View">
+    <button type="button" role="tab" id="tab-chat" aria-selected="true">Chat</button>
+    <button type="button" role="tab" id="tab-docs" aria-selected="false">Documents</button>
+  </nav>
+  <button type="button" class="btn secondary small" id="new-chat">New chat</button>
 </header>
 
-<div class="app">
-  <!-- Conversation -->
-  <main class="chat" aria-label="Conversation">
-    <div class="messages" id="messages">
-      <div class="messages-inner" id="thread"></div>
-    </div>
+<div class="layout">
+  <!-- ============ Documents ============ -->
+  <section class="card docs" aria-labelledby="docs-title">
+    <div class="card-head"><h2 id="docs-title">Documents</h2><span class="count" id="doc-count"></span></div>
+    <form class="upload" id="upload-form">
+      <label class="drop" id="drop" for="file">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/>
+        </svg>
+        <strong>Drop a file here or click to browse</strong>
+        <small>PDF, Word, PowerPoint, text or image</small>
+        <span class="chosen" id="chosen"></span>
+      </label>
+      <input type="file" id="file" class="sr-only" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
+      <div class="upload-row">
+        <label class="sr-only" for="format-hint">Document type</label>
+        <select id="format-hint">
+          <option value="">Detect type automatically</option>
+          <option value="typed">Typed</option>
+          <option value="scanned">Scanned or printed</option>
+          <option value="handwritten">Handwritten</option>
+        </select>
+        <button type="submit" class="btn" id="upload-btn">Upload</button>
+      </div>
+      <p class="notice" id="upload-notice" role="status"></p>
+    </form>
+    <ul class="doc-list" id="doc-list"></ul>
+  </section>
+
+  <!-- ============ Chat ============ -->
+  <section class="card chat" aria-label="Chat">
+    <div class="messages" id="messages"><div class="thread" id="thread"></div></div>
     <div class="composer">
       <form id="ask-form">
-        <label class="visually-hidden" for="question">Your question</label>
-        <textarea id="question" rows="1" placeholder="Ask about your documents…" required></textarea>
+        <label class="sr-only" for="question">Your question</label>
+        <textarea id="question" rows="1" placeholder="Ask about your documents…"></textarea>
         <button type="submit" class="btn" id="ask-btn">Send</button>
       </form>
-      <p class="hint">Enter to send · Shift + Enter for a new line · Answers come only from your uploaded documents</p>
+      <p class="hint">Enter to send · Shift + Enter for a new line</p>
     </div>
-  </main>
-
-  <!-- Documents: upload, list, preview -->
-  <aside class="docs-panel" id="docs-panel" aria-label="Documents">
-    <section aria-labelledby="upload-title">
-      <div class="section-title"><h2 id="upload-title">Upload</h2></div>
-      <form id="upload-form">
-        <label class="drop" id="drop" for="file">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/>
-          </svg>
-          <strong>Drag a file here, or click to browse</strong>
-          <small>PDF, Word, PowerPoint, text, or an image</small>
-          <span class="chosen" id="chosen"></span>
-        </label>
-        <input type="file" id="file" class="visually-hidden" required
-               accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
-        <div class="upload-row">
-          <label class="visually-hidden" for="hint">Document type</label>
-          <select id="hint" title="Document type">
-            <option value="">Detect type automatically</option>
-            <option value="typed">Typed</option>
-            <option value="scanned">Scanned or printed</option>
-            <option value="handwritten">Handwritten</option>
-          </select>
-          <button type="submit" class="btn" id="upload-btn">Upload</button>
-        </div>
-        <p class="status" id="upload-status" role="status"></p>
-      </form>
-    </section>
-
-    <section aria-labelledby="docs-title">
-      <div class="section-title"><h2 id="docs-title">Documents</h2><span id="doc-count"></span></div>
-      <ul class="docs" id="docs"></ul>
-    </section>
-
-    <section id="preview" aria-labelledby="preview-title" hidden>
-      <div class="section-title"><h2 id="preview-title">Preview</h2>
-        <button type="button" class="icon-btn" id="close-preview" aria-label="Close preview">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
-        </button>
-      </div>
-      <p class="preview-name" id="preview-name"></p>
-      <div class="preview-nav">
-        <button type="button" class="btn-outline" id="prev-page" aria-label="Previous page">‹ Prev</button>
-        <span class="where" id="preview-where"></span>
-        <button type="button" class="btn-outline" id="next-page" aria-label="Next page">Next ›</button>
-      </div>
-      <div class="preview-page" id="preview-page"></div>
-      <a class="preview-open" id="preview-open" target="_blank" rel="noopener" hidden>Open page at full size</a>
-    </section>
-  </aside>
+  </section>
 </div>
-<div class="scrim" id="scrim"></div>
 
+<!-- ============ Preview window ============ -->
+<dialog class="preview" id="preview" aria-labelledby="preview-title">
+  <div class="preview-inner">
+    <div class="preview-head">
+      <h2 id="preview-title"></h2>
+      <button type="button" class="icon-btn" id="preview-close" aria-label="Close preview">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="preview-body" id="preview-body"></div>
+    <div class="preview-foot">
+      <button type="button" class="btn secondary small" id="page-prev">‹ Previous</button>
+      <span class="where" id="page-where"></span>
+      <a id="page-full" target="_blank" rel="noopener">Full size</a>
+      <button type="button" class="btn secondary small" id="page-next">Next ›</button>
+    </div>
+  </div>
+</dialog>
 
 <script>
+/* =====================================================================
+   Small helpers
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+function h(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) k === "class" ? (node.className = v) : node.setAttribute(k, v);
+  node.append(...children);
+  return node;
+}
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const ICON_TRASH = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+
+/* =====================================================================
+   Server connection
+   Normally the page is served by the DocBlendAI server. If index.html is opened
+   directly (or from an editor preview), fall back to the default local server.
+   ===================================================================== */
+const Server = {
+  LOCAL: "http://127.0.0.1:8000",
+  DOWN: "Cannot reach the DocBlendAI server. Start it with: venv/Scripts/python -m uvicorn app.main:app --port 8000, then open http://localhost:8000",
+  base: null,
+
+  async find() {
+    if (this.base !== null) return;
+    const candidates = location.protocol.startsWith("http") ? [location.origin, this.LOCAL] : [this.LOCAL];
+    for (const base of candidates) {
+      try {
+        const r = await fetch(`${base}/health`);
+        if (r.ok && (await r.json()).status === "ok") { this.base = base === location.origin ? "" : base; return; }
+      } catch { /* try next */ }
+    }
+    throw new Error(this.DOWN);
+  },
+  url(path) { return `${this.base || ""}${path}`; },
+
+  async call(path, options = {}) {
+    await this.find();
+    let resp;
+    try { resp = await fetch(this.url(path), options); }
+    catch { this.base = null; throw new Error(this.DOWN); }
+    const body = resp.status === 204 ? {} : await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${resp.status})`);
+    return { body, status: resp.status };
+  },
+  async get(path) { return (await this.call(path)).body; },
+  async post(path, data) {
+    return (await this.call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })).body;
+  },
+};
+
+/* =====================================================================
+   Documents: upload (click or drag and drop), list, remove
+   ===================================================================== */
+const FORMAT = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
+const TYPE_TAG = { pdf: "PDF", docx: "DOCX", pptx: "PPTX", txt: "TXT" };
+
+const Docs = {
+  names: {},   // doc_id -> original file name
+
+  nameOf(id) { return this.names[id] || id.slice(0, 8); },
+  hasAny() { return Object.keys(this.names).length > 0; },
+  notice(text, kind = "") { const n = $("upload-notice"); n.className = `notice ${kind}`.trim(); n.textContent = text; },
+
+  fileName(doc) {  // uploads are stored as "<doc_id>_<original name>.<ext>"
+    const base = doc.file_path.split(/[\\/]/).pop();
+    return base.startsWith(doc.doc_id + "_") ? base.slice(doc.doc_id.length + 1) : base;
+  },
+
+  async load() {
+    const docs = await Server.get("/documents");
+    this.names = {};
+    const list = $("doc-list");
+    list.replaceChildren();
+    $("doc-count").textContent = docs.length ? plural(docs.length, "file") : "";
+    if (!docs.length) list.append(h("li", { class: "empty" }, "No documents yet. Upload one to get started."));
+    for (const doc of docs) list.append(this.row(doc));
+    Chat.refreshWelcome();
+  },
+
+  row(doc) {
+    const name = this.fileName(doc);
+    this.names[doc.doc_id] = name;
+    const open = h("button", { type: "button", class: "doc-open", title: `Preview ${name}` },
+      h("span", { class: "ftype", "aria-hidden": "true" }, TYPE_TAG[name.split(".").pop().toLowerCase()] || "IMG"),
+      h("span", { class: "doc-text" },
+        h("span", { class: "doc-name" }, name),
+        h("span", { class: "doc-meta" }, `${FORMAT[doc.format_type]} · ${plural(doc.page_count, "page")}`)));
+    open.addEventListener("click", () => Preview.open(doc.doc_id).catch((e) => this.notice(e.message, "error")));
+    const remove = h("button", { type: "button", class: "icon-btn remove", "aria-label": `Remove ${name}`, title: "Remove" });
+    remove.innerHTML = ICON_TRASH;
+    remove.addEventListener("click", () => this.remove(doc.doc_id, remove));
+    return h("li", { class: "doc" }, open, remove);
+  },
+
+  async remove(id, button) {   // deletes straight away, no confirmation
+    button.disabled = true;
+    const name = this.nameOf(id);
+    try {
+      await Server.call(`/documents/${id}`, { method: "DELETE" });
+      Preview.forget(id);
+      this.notice(`Removed ${name}.`);
+      await this.load();
+    } catch (e) {
+      button.disabled = false;
+      this.notice(e.message, "error");
+    }
+  },
+
+  async upload(file) {
+    const form = new FormData();
+    form.append("file", file);
+    const hint = $("format-hint").value;
+    if (hint) form.append("format_hint", hint);
+    const btn = $("upload-btn");
+    btn.disabled = true; btn.textContent = "Uploading…";
+    this.notice("Reading the file. Scanned and handwritten pages can take a minute.");
+    try {
+      const { body: doc, status } = await Server.call("/upload", { method: "POST", body: form });
+      await this.load();
+      if (status === 200) this.notice(`Already uploaded as ${this.nameOf(doc.doc_id)}, so it was not added again.`);
+      else this.notice(`Added ${this.nameOf(doc.doc_id)}: ${FORMAT[doc.format_type].toLowerCase()}, ${plural(doc.page_count, "page")}.`, "ok");
+      $("upload-form").reset(); this.showChosen();
+    } catch (e) {
+      this.notice(e.message, "error");
+    } finally { btn.disabled = false; btn.textContent = "Upload"; }
+  },
+
+  showChosen() { const f = $("file").files[0]; $("chosen").textContent = f ? `Selected: ${f.name}` : ""; },
+
+  init() {
+    $("file").addEventListener("change", () => this.showChosen());
+    $("upload-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const file = $("file").files[0];
+      if (!file) { this.notice("Choose a file first.", "error"); return; }
+      this.upload(file);
+    });
+    // A file dropped anywhere on the page goes to the upload box (instead of the browser opening it).
+    const drop = $("drop");
+    const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+    window.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); drop.classList.add("dragging"); } });
+    window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) drop.classList.remove("dragging"); });
+    window.addEventListener("drop", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      drop.classList.remove("dragging");
+      if (!e.dataTransfer.files.length) return;
+      $("file").files = e.dataTransfer.files;
+      this.showChosen();
+      this.notice("File ready. Press Upload.");
+      Tabs.show("docs");
+    });
+  },
+};
+
+/* =====================================================================
+   Preview window: page images (PDF, images) or text (Word, PowerPoint, .txt)
+   ===================================================================== */
+const Preview = {
+  cache: {}, docId: null, page: 1, info: null,
+
+  async open(docId, page = 1) {
+    if (!this.cache[docId]) this.cache[docId] = await Server.get(`/documents/${docId}/preview`);
+    this.docId = docId; this.info = this.cache[docId];
+    this.page = Math.min(Math.max(1, page), this.info.page_count || 1);
+    this.render();
+    if (!$("preview").open) $("preview").showModal();
+  },
+
+  render() {
+    const { info, page, docId } = this;
+    $("preview-title").textContent = Docs.nameOf(docId);
+    $("page-where").textContent = `Page ${page} of ${info.page_count}`;
+    $("page-prev").disabled = page <= 1;
+    $("page-next").disabled = page >= info.page_count;
+    const body = $("preview-body"), full = $("page-full");
+    if (info.kind === "text") {
+      body.replaceChildren(h("pre", {}, info.text_pages[page - 1] || "(This page has no text.)"));
+      full.hidden = true;
+    } else {
+      const src = Server.url(`/documents/${docId}/pages/${page}`);
+      body.replaceChildren(h("img", { src, alt: `${Docs.nameOf(docId)}, page ${page}` }));
+      full.href = src; full.hidden = false;
+    }
+    body.scrollTop = 0;
+  },
+
+  forget(docId) { delete this.cache[docId]; if (this.docId === docId && $("preview").open) $("preview").close(); },
+
+  init() {
+    $("page-prev").addEventListener("click", () => { this.page--; this.render(); });
+    $("page-next").addEventListener("click", () => { this.page++; this.render(); });
+    $("preview-close").addEventListener("click", () => $("preview").close());
+    $("preview").addEventListener("click", (e) => { if (e.target === $("preview")) $("preview").close(); });  // click outside
+  },
+};
+
+/* =====================================================================
+   Chat: the current conversation only (no saved history). The last few turns
+   are sent with each question so follow-ups like "explain that" work.
+   ===================================================================== */
 const WHY = {
   Certain: "Strong match in clearly readable text.",
   Moderate: "Relevant text found, but the match was looser or the text was only partly legible.",
   Uncertain: "No strong supporting passage. Check the source before relying on this.",
   Unreadable: "The relevant passage could not be read reliably (poor scan or handwriting).",
 };
-const FORMAT_LABEL = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
-const TYPE_TAG = { pdf: "PDF", docx: "DOCX", pptx: "PPTX", txt: "TXT" };
-const ICON = {
-  trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
-};
-const $ = (id) => document.getElementById(id);
 
-// ---------------- helpers ----------------
-const docNames = {};
-function nameFromPath(doc) {  // uploads are stored as "<doc_id>_<original name>.<ext>"
-  const base = doc.file_path.split(/[\\/]/).pop();
-  return base.startsWith(doc.doc_id + "_") ? base.slice(doc.doc_id.length + 1) : base;
-}
-function docLabel(id) { return docNames[id] || id.slice(0, 8); }
-function typeTag(name) { return TYPE_TAG[name.split(".").pop().toLowerCase()] || "IMG"; }
-function pages(n) { return `${n} page${n === 1 ? "" : "s"}`; }
-function el(tag, attrs = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) k === "class" ? (node.className = v) : node.setAttribute(k, v);
-  for (const c of children) node.append(c);
-  return node;
-}
-function iconButton(icon, label, extra = "") {
-  const b = el("button", { type: "button", class: `icon-btn ${extra}`.trim(), "aria-label": label, title: label });
-  b.innerHTML = ICON[icon];
-  return b;
-}
-function setStatus(id, text, kind = "") { const s = $(id); s.className = `status ${kind}`.trim(); s.textContent = text; }
-// Answers may use light Markdown (**bold**, lists). Escape first, then format: never inject raw HTML.
-function renderAnswer(text) {
-  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|\W)\*(\S.*?)\*(?=\W|$)/g, "$1<em>$2</em>");
-  let html = "", list = null;
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    const bullet = line.match(/^[-*•]\s+(.*)/), numbered = line.match(/^\d+[.)]\s+(.*)/);
-    const kind = bullet ? "ul" : numbered ? "ol" : null;
-    if (list && kind !== list) { html += `</${list}>`; list = null; }
-    if (kind) {
-      if (!list) { html += `<${kind}>`; list = kind; }
-      html += `<li>${inline((bullet || numbered)[1])}</li>`;
-    } else if (line) {
-      html += `<p>${inline(line)}</p>`;
+const Chat = {
+  turns: [],   // {question, answer}
+
+  reset() {
+    this.turns = [];
+    $("thread").replaceChildren(this.welcome());
+    $("question").focus();
+  },
+
+  welcome() {
+    return h("div", { class: "welcome" },
+      h("h3", {}, "Ask about your documents"),
+      h("p", {}, Docs.hasAny()
+        ? "Ask a question, then follow up on the answer. Each answer shows how far to trust it and which pages it came from."
+        : "Upload a document first, then ask a question here."));
+  },
+  refreshWelcome() { const w = $("thread").querySelector(".welcome"); if (w) w.replaceWith(this.welcome()); },
+
+  // Answers may use light Markdown (**bold**, lists). Escape first; never inject raw HTML.
+  renderAnswer(text) {
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|\W)\*(\S.*?)\*(?=\W|$)/g, "$1<em>$2</em>");
+    let html = "", list = null;
+    for (const raw of text.split("\n")) {
+      const line = raw.trim();
+      const bullet = line.match(/^[-*•]\s+(.*)/), numbered = line.match(/^\d+[.)]\s+(.*)/);
+      const kind = bullet ? "ul" : numbered ? "ol" : null;
+      if (list && kind !== list) { html += `</${list}>`; list = null; }
+      if (kind) { if (!list) { html += `<${kind}>`; list = kind; } html += `<li>${inline((bullet || numbered)[1])}</li>`; }
+      else if (line) html += `<p>${inline(line)}</p>`;
     }
-  }
-  if (list) html += `</${list}>`;
-  const div = el("div", { class: "body" });
-  div.innerHTML = html;
-  return div;
-}
+    if (list) html += `</${list}>`;
+    const div = h("div", { class: "answer" });
+    div.innerHTML = html;
+    return div;
+  },
 
-// ---------------- server connection ----------------
-// Normally the page is served by the DocBlendAI server (same origin). If index.html was opened
-// directly or from an editor preview, fall back to the default local server.
-const LOCAL_SERVER = "http://127.0.0.1:8000";
-const SERVER_DOWN = "Cannot reach the DocBlendAI server. Start it with: " +
-  "venv/Scripts/python -m uvicorn app.main:app --port 8000, then open http://localhost:8000";
-let apiBase = null;
-async function findServer() {
-  if (apiBase !== null) return apiBase;
-  const candidates = location.protocol.startsWith("http") ? [location.origin, LOCAL_SERVER] : [LOCAL_SERVER];
-  for (const base of candidates) {
+  meter(label, v) {
+    const pct = Math.round(v * 100);
+    return h("span", { class: "meter", title: `${label}: ${pct}%` }, label, h("i", {}, h("b", { style: `width:${pct}%` })), h("em", {}, `${pct}%`));
+  },
+
+  source(s, n) {
+    const where = h("div", { class: "where" }, h("b", {}, Docs.nameOf(s.doc_id)));
+    if (s.page) {
+      let text = `Page ${s.page}`;
+      if (s.first_line) text += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
+      const link = h("button", { type: "button", class: "page-link", title: "Open this page" }, text);
+      link.addEventListener("click", () => Preview.open(s.doc_id, s.page).catch((e) => this.fail(e.message)));
+      where.append(" · ", link);
+    }
+    return h("li", { class: "source" },
+      h("span", { class: "n" }, `${n}.`),
+      where,
+      h("div", { class: "scores" }, this.meter("Match", s.similarity), this.meter("Readability", s.confidence)),
+      h("details", {}, h("summary", {}, "Show passage"), h("blockquote", {}, s.text)));
+  },
+
+  botBubble(answer, sources) {
+    const label = answer.reliability_label;
+    const node = h("div", { class: "bubble-bot" },
+      h("div", { class: "meta" }, h("span", { class: "who" }, "DocBlendAI"), h("span", { class: `label ${label}` }, label)),
+      this.renderAnswer(answer.answer_text),
+      h("p", { class: "why" }, WHY[label]));
+    if (sources.length) {
+      const list = h("ol", { class: "source-list" });
+      sources.forEach((s, i) => list.append(this.source(s, i + 1)));
+      node.append(h("details", { class: "sources" }, h("summary", {}, `Sources (${sources.length})`), list));
+    }
+    return node;
+  },
+
+  fail(message) { $("thread").append(h("div", { class: "bubble-bot failed" }, message)); this.scroll(); },
+  scroll() { const m = $("messages"); m.scrollTop = m.scrollHeight; },
+
+  async ask(text) {
+    const thread = $("thread");
+    thread.querySelector(".welcome")?.remove();
+    const pending = h("div", { class: "bubble-bot pending" }, h("span", { class: "dots" }, "Reading your documents"));
+    thread.append(h("div", { class: "bubble-user" }, text), pending);
+    this.scroll();
     try {
-      const resp = await fetch(`${base}/health`);
-      if (resp.ok && (await resp.json()).status === "ok") return (apiBase = base === location.origin ? "" : base);
-    } catch { /* try the next one */ }
-  }
-  throw new Error(SERVER_DOWN);
-}
-const url = (path) => `${apiBase || ""}${path}`;
-async function api(path, options, withStatus = false) {
-  await findServer();
-  let resp;
-  try { resp = await fetch(url(path), options); }
-  catch { apiBase = null; throw new Error(SERVER_DOWN); }
-  const body = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${resp.status})`);
-  return withStatus ? { body, status: resp.status } : body;
-}
-const json = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
+      const reply = await Server.post("/chat", { question_text: text, history: this.turns.slice(-3) });
+      this.turns.push({ question: text, answer: reply.answer.answer_text });
+      pending.replaceWith(this.botBubble(reply.answer, reply.sources));
+      return true;
+    } catch (e) {
+      pending.className = "bubble-bot failed";
+      pending.textContent = e.message;
+      return false;
+    } finally { this.scroll(); }
+  },
 
-// ---------------- drawers (tablet / phone) ----------------
-function closeDrawers() { document.body.classList.remove("show-docs"); }
-$("toggle-docs").addEventListener("click", () => document.body.classList.toggle("show-docs"));
-$("scrim").addEventListener("click", closeDrawers);
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawers(); });
-const isDrawer = (id) => getComputedStyle($(id)).position === "fixed";
+  init() {
+    const q = $("question"), btn = $("ask-btn");
+    const fit = () => { q.style.height = "auto"; q.style.height = `${Math.min(q.scrollHeight, 160)}px`; };
+    q.addEventListener("input", fit);
+    q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask-form").requestSubmit(); } });
+    $("ask-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = q.value.trim();
+      if (!text || btn.disabled) return;
+      btn.disabled = true;
+      q.value = ""; fit();
+      const ok = await this.ask(text);
+      if (!ok && !q.value) { q.value = text; fit(); }   // keep the question so it can be re-sent
+      btn.disabled = false; q.focus();
+    });
+    $("new-chat").addEventListener("click", () => { this.reset(); Tabs.show("chat"); });
+  },
+};
 
-function showWelcome() {
-  const hasDocs = Object.keys(docNames).length > 0;
-  $("thread").replaceChildren(el("div", { class: "welcome" },
-    el("h2", {}, "Ask about your documents"),
-    el("p", {}, hasDocs
-      ? "Ask a question and follow up on it. Every answer shows how far to trust it and which pages it came from."
-      : "Start by uploading a document in the Documents panel, then ask a question here.")));
-}
+/* =====================================================================
+   Tabs (small screens only): Chat | Documents
+   ===================================================================== */
+const Tabs = {
+  show(tab) {
+    document.body.dataset.tab = tab;
+    $("tab-chat").setAttribute("aria-selected", tab === "chat");
+    $("tab-docs").setAttribute("aria-selected", tab === "docs");
+  },
+  init() {
+    $("tab-chat").addEventListener("click", () => this.show("chat"));
+    $("tab-docs").addEventListener("click", () => this.show("docs"));
+  },
+};
 
-// The current conversation lives only in this page: it is sent along with each question so
-// follow-ups work, and is gone after "New chat" or a reload. No chat history is kept.
-let turns = [];  // {question, answer}
-
-function newChat() {
-  turns = [];
-  showWelcome();
-  $("question").focus();
-}
-$("new-chat").addEventListener("click", newChat);
-
-// ---------------- messages ----------------
-function userMessage(text) { return el("div", { class: "msg-user" }, text); }
-
-function meter(label, v) {
-  const pct = Math.round(v * 100);
-  return el("span", { class: "meter", title: `${label} ${pct}%` }, label, el("i", {}, el("b", { style: `width:${pct}%` })), el("em", {}, `${pct}%`));
-}
-
-function citation(s, n) {
-  const where = el("div", { class: "cite-where" }, el("b", {}, docLabel(s.doc_id)));
-  if (s.page) {
-    let text = `Page ${s.page}`;
-    if (s.first_line) text += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
-    const link = el("button", { class: "cite-page", type: "button", title: "Show this page" }, text);
-    link.addEventListener("click", () => openPreview(s.doc_id, s.page, true).catch((err) => setStatus("upload-status", err.message, "error")));
-    where.append(" · ", link);
-  }
-  return el("li", { class: "cite" },
-    el("span", { class: "cite-n" }, `${n}.`),
-    where,
-    el("div", { class: "scores" }, meter("Match", s.similarity), meter("Readability", s.confidence)),
-    el("details", {}, el("summary", {}, "Show passage"), el("blockquote", {}, s.text)));
-}
-
-function botMessage(answer, sources) {
-  const label = answer.reliability_label;
-  const node = el("div", { class: "msg-bot" },
-    el("div", { class: "top" }, el("span", { class: "who" }, "DocBlendAI"), el("span", { class: `tag ${label}` }, label)),
-    renderAnswer(answer.answer_text),
-    el("p", { class: "why" }, WHY[label]));
-  if (sources.length) {
-    const list = el("ol", {});
-    sources.forEach((s, i) => list.append(citation(s, i + 1)));
-    node.append(el("details", { class: "sources" }, el("summary", {}, `Sources (${sources.length})`), list));
-  }
-  return node;
-}
-
-function scrollToEnd() { const m = $("messages"); m.scrollTop = m.scrollHeight; }
-
-const question = $("question");
-function fitComposer() { question.style.height = "auto"; question.style.height = `${Math.min(question.scrollHeight, 180)}px`; }
-question.addEventListener("input", fitComposer);
-question.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask-form").requestSubmit(); }
-});
-
-$("ask-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = question.value.trim();
-  if (!text) return;
-  const btn = $("ask-btn");
-  btn.disabled = true;
-  const thread = $("thread");
-  thread.querySelector(".welcome")?.remove();
-  const pending = el("div", { class: "msg-bot pending" }, el("div", { class: "body" }, el("span", { class: "dots" }, "Reading your documents")));
-  thread.append(userMessage(text), pending);
-  question.value = ""; fitComposer();
-  scrollToEnd();
-  try {
-    const reply = await api("/chat", json("POST", { question_text: text, history: turns.slice(-3) }));
-    turns.push({ question: text, answer: reply.answer.answer_text });
-    pending.replaceWith(botMessage(reply.answer, reply.sources));
-  } catch (err) {
-    pending.className = "msg-bot failed";
-    pending.replaceChildren(el("div", { class: "body" }, err.message));
-    if (!question.value) { question.value = text; fitComposer(); }  // keep the question so it can be re-sent
-  } finally {
-    btn.disabled = false; question.focus(); scrollToEnd();
-  }
-});
-
-// ---------------- documents ----------------
-const view = { docId: null, page: 1, info: null };
-const previewCache = {};
-
-async function openPreview(docId, page = 1, reveal = false) {
-  if (!previewCache[docId]) previewCache[docId] = await api(`/documents/${docId}/preview`);
-  view.docId = docId; view.info = previewCache[docId];
-  view.page = Math.min(Math.max(1, page), view.info.page_count || 1);
-  renderPreview();
-  document.querySelectorAll(".doc").forEach((li) => li.classList.toggle("selected", li.dataset.id === docId));
-  if (reveal) {
-    if (isDrawer("docs-panel")) document.body.classList.add("show-docs");
-    $("preview").scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-}
-
-function renderPreview() {
-  const { info, page, docId } = view;
-  $("preview").hidden = false;
-  $("preview-name").textContent = docLabel(docId);
-  $("preview-where").textContent = `Page ${page} of ${info.page_count}`;
-  $("prev-page").disabled = page <= 1;
-  $("next-page").disabled = page >= info.page_count;
-  const box = $("preview-page"), open = $("preview-open");
-  if (info.kind === "text") {
-    box.replaceChildren(el("pre", {}, info.text_pages[page - 1] || "(This page has no text.)"));
-    open.hidden = true;
-  } else {
-    const src = url(`/documents/${docId}/pages/${page}`);
-    box.replaceChildren(el("img", { src, alt: `${docLabel(docId)}, page ${page}` }));
-    open.href = src; open.hidden = false;
-  }
-}
-function closePreview() {
-  view.docId = null; $("preview").hidden = true;
-  document.querySelectorAll(".doc.selected").forEach((li) => li.classList.remove("selected"));
-}
-$("prev-page").addEventListener("click", () => { view.page--; renderPreview(); });
-$("next-page").addEventListener("click", () => { view.page++; renderPreview(); });
-$("close-preview").addEventListener("click", closePreview);
-
-async function deleteDoc(d, button) {
-  button.disabled = true;
-  try {
-    await api(`/documents/${d.doc_id}`, { method: "DELETE" });
-    if (view.docId === d.doc_id) closePreview();
-    delete previewCache[d.doc_id];
-    setStatus("upload-status", `Removed ${docLabel(d.doc_id)}.`);
-    await loadDocs();
-  } catch (err) {
-    button.disabled = false;
-    setStatus("upload-status", err.message, "error");
-  }
-}
-
-async function loadDocs() {
-  const list = $("docs");
-  const docs = await api("/documents");
-  list.replaceChildren();
-  for (const k of Object.keys(docNames)) delete docNames[k];
-  $("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
-  if (!docs.length) list.append(el("li", { class: "muted-note" }, "No documents yet."));
-  for (const d of docs) {
-    const name = nameFromPath(d);
-    docNames[d.doc_id] = name;
-    const open = el("button", { class: "doc-open", type: "button", title: `Preview ${name}` },
-      el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(name)),
-      el("span", { class: "doc-info" },
-        el("span", { class: "doc-name" }, name),
-        el("span", { class: "doc-meta" }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)));
-    open.addEventListener("click", () => openPreview(d.doc_id).catch((err) => setStatus("upload-status", err.message, "error")));
-    const remove = iconButton("trash", `Remove ${name}`, "danger");
-    remove.addEventListener("click", () => deleteDoc(d, remove));
-    const li = el("li", { class: `doc${view.docId === d.doc_id ? " selected" : ""}` }, open, remove);
-    li.dataset.id = d.doc_id;
-    list.append(li);
-  }
-  if ($("thread").querySelector(".welcome")) showWelcome();  // the hint depends on whether documents exist
-}
-
-// Upload: click the box, or drop a file anywhere on the page (instead of the browser opening it).
-const fileInput = $("file"), drop = $("drop");
-function showChosen() { const f = fileInput.files[0]; $("chosen").textContent = f ? `Selected: ${f.name}` : ""; }
-fileInput.addEventListener("change", showChosen);
-const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
-window.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); drop.classList.add("dragging"); } });
-window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) drop.classList.remove("dragging"); });
-window.addEventListener("drop", (e) => {
-  if (!hasFiles(e)) return;
-  e.preventDefault();
-  drop.classList.remove("dragging");
-  if (e.dataTransfer.files.length) {
-    fileInput.files = e.dataTransfer.files;
-    showChosen();
-    setStatus("upload-status", "File ready. Press Upload.");
-    if (isDrawer("docs-panel")) document.body.classList.add("show-docs");
-  }
-});
-
-$("upload-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const file = fileInput.files[0];
-  if (!file) { setStatus("upload-status", "Choose a file first.", "error"); return; }
-  const btn = $("upload-btn");
-  const form = new FormData();
-  form.append("file", file);
-  const hint = $("hint").value;
-  if (hint) form.append("format_hint", hint);
-  btn.disabled = true; btn.textContent = "Uploading…";
-  setStatus("upload-status", "Reading the file. Scanned and handwritten pages can take a minute.");
-  try {
-    const { body: doc, status: code } = await api("/upload", { method: "POST", body: form }, true);
-    await loadDocs();
-    if (code === 200) setStatus("upload-status", `Already uploaded as ${docLabel(doc.doc_id)}, so it was not added again.`);
-    else setStatus("upload-status", `Added: ${FORMAT_LABEL[doc.format_type].toLowerCase()}, ${pages(doc.page_count)}.`, "ok");
-    e.target.reset(); showChosen();
-    openPreview(doc.doc_id).catch(() => {});
-  } catch (err) {
-    setStatus("upload-status", err.message, "error");
-  } finally { btn.disabled = false; btn.textContent = "Upload"; }
-});
-
-// ---------------- start ----------------
-(async () => {
-  try {
-    await loadDocs();
-    newChat();
-  } catch (err) {
-    showWelcome();
-    $("thread").append(el("div", { class: "msg-bot failed" }, el("div", { class: "body" }, err.message)));
-  }
-})();
+/* =====================================================================
+   Start
+   ===================================================================== */
+Docs.init(); Preview.init(); Chat.init(); Tabs.init();
+Chat.reset();
+Docs.load().catch((e) => { Docs.notice(e.message, "error"); Chat.fail(e.message); });
 </script>
 </body>
 </html>
