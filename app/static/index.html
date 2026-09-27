@@ -48,9 +48,8 @@
   header .tagline { font-size: 13.5px; color: var(--muted); }
   header .spacer { flex: 1; }
   .panel-toggle { display: none; }
-  .app { height: calc(100% - var(--header-h)); display: grid; grid-template-columns: 260px minmax(0, 1fr) 380px; }
-  .sidebar, .docs-panel { overflow-y: auto; background: var(--surface); }
-  .sidebar { border-right: 1px solid var(--line); padding: 14px 12px; overflow-x: hidden; }
+  .app { height: calc(100% - var(--header-h)); display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+  .docs-panel { overflow-y: auto; background: var(--surface); }
   .docs-panel { border-left: 1px solid var(--line); padding: 16px; display: grid; gap: 22px; align-content: start; }
   .chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
@@ -77,22 +76,7 @@
   .status.error { color: var(--error); }
   .status.ok { color: var(--certain); }
 
-  /* ---------- sidebar: chat history ---------- */
-  .new-chat { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 18px; }
-  .history-label { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint);
-                   margin: 0 6px 6px; }
-  ul.chats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  .chat-item { display: flex; align-items: center; gap: 2px; border-radius: var(--radius); }
-  .chat-item:hover { background: var(--sunk); }
-  .chat-item.active { background: var(--blue-soft); }
-  .chat-open { flex: 1; min-width: 0; border: 0; background: none; text-align: left; padding: 7px 8px; cursor: pointer; }
-  .chat-title { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chat-item.active .chat-title { font-weight: 600; color: var(--heading); }
-  .chat-when { display: block; font-size: 12px; color: var(--faint); }
-  .chat-actions { display: flex; opacity: 0; padding-right: 4px; }
-  .chat-item:hover .chat-actions, .chat-item.active .chat-actions, .chat-item:focus-within .chat-actions { opacity: 1; }
-  @media (hover: none) { .chat-actions { opacity: 1; } }
-  .muted-note { font-size: 13.5px; color: var(--muted); margin: 4px 6px; }
+  .muted-note { font-size: 13.5px; color: var(--muted); margin: 4px 0; }
 
   /* ---------- chat column ---------- */
   .messages { flex: 1; overflow-y: auto; padding: 24px 28px 12px; }
@@ -185,7 +169,7 @@
   /* ---------- responsive: side panels become drawers ---------- */
   .scrim { display: none; }
   @media (max-width: 1180px) {
-    .app { grid-template-columns: 240px minmax(0, 1fr); }
+    .app { grid-template-columns: minmax(0, 1fr); }
     .docs-panel { position: fixed; top: var(--header-h); right: 0; bottom: 0; width: min(380px, 92vw); z-index: 20;
                   transform: translateX(100%); transition: transform .18s ease; box-shadow: -1px 0 0 var(--line); }
     body.show-docs .docs-panel { transform: none; }
@@ -193,41 +177,26 @@
   }
   @media (max-width: 760px) {
     header .tagline { display: none; }
-    .app { grid-template-columns: minmax(0, 1fr); }
-    .sidebar { position: fixed; top: var(--header-h); left: 0; bottom: 0; width: min(300px, 86vw); z-index: 20;
-               transform: translateX(-100%); transition: transform .18s ease; }
-    body.show-chats .sidebar { transform: none; }
-    .panel-toggle.chats { display: inline-flex; }
     .messages { padding: 16px 14px 8px; }
     .composer { padding: 10px 12px 12px; }
     .msg-user { max-width: 90%; }
   }
   @media (max-width: 1180px) {
-    body.show-docs .scrim, body.show-chats .scrim { display: block; position: fixed; inset: var(--header-h) 0 0 0;
+    body.show-docs .scrim { display: block; position: fixed; inset: var(--header-h) 0 0 0;
                                                     background: rgba(30, 43, 60, 0.25); z-index: 10; }
   }
 </style>
 </head>
 <body>
 <header>
-  <button type="button" class="btn-outline panel-toggle chats" id="toggle-chats" aria-controls="sidebar">Chats</button>
   <h1>DocBlendAI</h1>
   <span class="tagline">Question answering over typed, scanned and handwritten notes</span>
   <span class="spacer"></span>
+  <button type="button" class="btn-outline" id="new-chat" title="Clear this conversation and start again">New chat</button>
   <button type="button" class="btn-outline panel-toggle docs" id="toggle-docs" aria-controls="docs-panel">Documents</button>
 </header>
 
 <div class="app">
-  <!-- Chat history -->
-  <nav class="sidebar" id="sidebar" aria-label="Chats">
-    <button type="button" class="btn new-chat" id="new-chat">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-      New chat
-    </button>
-    <p class="history-label">History</p>
-    <ul class="chats" id="chats"></ul>
-  </nav>
-
   <!-- Conversation -->
   <main class="chat" aria-label="Conversation">
     <div class="messages" id="messages">
@@ -307,7 +276,6 @@ const WHY = {
 const FORMAT_LABEL = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
 const TYPE_TAG = { pdf: "PDF", docx: "DOCX", pptx: "PPTX", txt: "TXT" };
 const ICON = {
-  rename: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
   trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
 };
 const $ = (id) => document.getElementById(id);
@@ -333,18 +301,6 @@ function iconButton(icon, label, extra = "") {
   return b;
 }
 function setStatus(id, text, kind = "") { const s = $(id); s.className = `status ${kind}`.trim(); s.textContent = text; }
-function whenLabel(iso) {
-  const d = new Date(iso), today = new Date();
-  const days = Math.floor((new Date(today.toDateString()) - new Date(d.toDateString())) / 86400000);
-  if (days === 0) return `Today, ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
-  if (days === 1) return "Yesterday";
-  return d.toLocaleDateString([], { day: "numeric", month: "short", year: d.getFullYear() === today.getFullYear() ? undefined : "numeric" });
-}
-const store = {  // per-browser convenience only (which chat was open); the chats themselves live on the server
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* private mode */ } },
-};
-
 // Answers may use light Markdown (**bold**, lists). Escape first, then format: never inject raw HTML.
 function renderAnswer(text) {
   const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -399,39 +355,11 @@ async function api(path, options, withStatus = false) {
 const json = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
 
 // ---------------- drawers (tablet / phone) ----------------
-function closeDrawers() { document.body.classList.remove("show-docs", "show-chats"); }
-$("toggle-docs").addEventListener("click", () => { document.body.classList.remove("show-chats"); document.body.classList.toggle("show-docs"); });
-$("toggle-chats").addEventListener("click", () => { document.body.classList.remove("show-docs"); document.body.classList.toggle("show-chats"); });
+function closeDrawers() { document.body.classList.remove("show-docs"); }
+$("toggle-docs").addEventListener("click", () => document.body.classList.toggle("show-docs"));
 $("scrim").addEventListener("click", closeDrawers);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawers(); });
 const isDrawer = (id) => getComputedStyle($(id)).position === "fixed";
-
-// ---------------- chats (history) ----------------
-let activeChat = null;   // conversation_id, or null for a new chat not yet saved
-let chatList = [];
-
-async function loadChats() {
-  chatList = await api("/conversations");
-  renderChatList();
-}
-
-function renderChatList() {
-  const list = $("chats");
-  list.replaceChildren();
-  if (!chatList.length) { list.append(el("li", { class: "muted-note" }, "Your chats will be listed here.")); return; }
-  for (const c of chatList) {
-    const open = el("button", { type: "button", class: "chat-open", title: c.title },
-      el("span", { class: "chat-title" }, c.title),
-      el("span", { class: "chat-when" }, whenLabel(c.updated_at)));
-    open.addEventListener("click", () => { openChat(c.conversation_id); if (isDrawer("sidebar")) closeDrawers(); });
-    const rename = iconButton("rename", `Rename "${c.title}"`);
-    rename.addEventListener("click", () => renameChat(c));
-    const del = iconButton("trash", `Delete "${c.title}"`, "danger");
-    del.addEventListener("click", () => deleteChat(c));
-    list.append(el("li", { class: `chat-item${c.conversation_id === activeChat ? " active" : ""}` },
-      open, el("span", { class: "chat-actions" }, rename, del)));
-  }
-}
 
 function showWelcome() {
   const hasDocs = Object.keys(docNames).length > 0;
@@ -442,45 +370,16 @@ function showWelcome() {
       : "Start by uploading a document in the Documents panel, then ask a question here.")));
 }
 
+// The current conversation lives only in this page: it is sent along with each question so
+// follow-ups work, and is gone after "New chat" or a reload. No chat history is kept.
+let turns = [];  // {question, answer}
+
 function newChat() {
-  activeChat = null;
-  store.set("docblend.chat", null);
+  turns = [];
   showWelcome();
-  renderChatList();
   $("question").focus();
 }
-
-async function openChat(id) {
-  try {
-    const chat = await api(`/conversations/${id}`);
-    activeChat = id;
-    store.set("docblend.chat", id);
-    const thread = $("thread");
-    thread.replaceChildren();
-    if (!chat.turns.length) showWelcome();
-    for (const t of chat.turns) thread.append(userMessage(t.question_text), botMessage(t.answer, t.sources));
-    renderChatList();
-    scrollToEnd();
-  } catch (err) {
-    if (/not found/i.test(err.message)) { newChat(); await loadChats(); } else throw err;
-  }
-}
-
-async function renameChat(c) {
-  const title = prompt("Rename chat", c.title);
-  if (!title || !title.trim() || title.trim() === c.title) return;
-  await api(`/conversations/${c.conversation_id}`, json("PATCH", { title: title.trim() }));
-  await loadChats();
-}
-
-async function deleteChat(c) {
-  if (!confirm(`Delete the chat "${c.title}" and its answers?`)) return;
-  await api(`/conversations/${c.conversation_id}`, { method: "DELETE" });
-  if (c.conversation_id === activeChat) newChat();
-  await loadChats();
-}
-
-$("new-chat").addEventListener("click", () => { newChat(); if (isDrawer("sidebar")) closeDrawers(); });
+$("new-chat").addEventListener("click", newChat);
 
 // ---------------- messages ----------------
 function userMessage(text) { return el("div", { class: "msg-user" }, text); }
@@ -542,13 +441,9 @@ $("ask-form").addEventListener("submit", async (e) => {
   question.value = ""; fitComposer();
   scrollToEnd();
   try {
-    if (!activeChat) {
-      activeChat = (await api("/conversations", json("POST", {}))).conversation_id;
-      store.set("docblend.chat", activeChat);
-    }
-    const turn = await api(`/conversations/${activeChat}/messages`, json("POST", { question_text: text }));
-    pending.replaceWith(botMessage(turn.answer, turn.sources));
-    await loadChats();
+    const reply = await api("/chat", json("POST", { question_text: text, history: turns.slice(-3) }));
+    turns.push({ question: text, answer: reply.answer.answer_text });
+    pending.replaceWith(botMessage(reply.answer, reply.sources));
   } catch (err) {
     pending.className = "msg-bot failed";
     pending.replaceChildren(el("div", { class: "body" }, err.message));
@@ -569,7 +464,7 @@ async function openPreview(docId, page = 1, reveal = false) {
   renderPreview();
   document.querySelectorAll(".doc").forEach((li) => li.classList.toggle("selected", li.dataset.id === docId));
   if (reveal) {
-    if (isDrawer("docs-panel")) { document.body.classList.remove("show-chats"); document.body.classList.add("show-docs"); }
+    if (isDrawer("docs-panel")) document.body.classList.add("show-docs");
     $("preview").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
@@ -654,7 +549,7 @@ window.addEventListener("drop", (e) => {
     fileInput.files = e.dataTransfer.files;
     showChosen();
     setStatus("upload-status", "File ready. Press Upload.");
-    if (isDrawer("docs-panel")) { document.body.classList.remove("show-chats"); document.body.classList.add("show-docs"); }
+    if (isDrawer("docs-panel")) document.body.classList.add("show-docs");
   }
 });
 
@@ -685,10 +580,7 @@ $("upload-form").addEventListener("submit", async (e) => {
 (async () => {
   try {
     await loadDocs();
-    await loadChats();
-    const last = store.get("docblend.chat");
-    if (last && chatList.some((c) => c.conversation_id === last)) await openChat(last);
-    else newChat();
+    newChat();
   } catch (err) {
     showWelcome();
     $("thread").append(el("div", { class: "msg-bot failed" }, el("div", { class: "body" }, err.message)));
