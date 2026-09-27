@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.db.database import init_db
-from app.routers import query, upload
+from app.routers import preview, query, upload
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -42,6 +42,7 @@ app = FastAPI(
 
 app.include_router(upload.router)
 app.include_router(query.router)
+app.include_router(preview.router)
 
 
 @app.get("/health", tags=["system"])
