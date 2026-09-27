@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     similarity_weight: float = 0.7
     # Re-ranking pool: fetch top_k * this many by similarity, then re-sort by combined_score.
     candidate_multiplier: int = 3
+    # Chunks whose similarity is within this of the best match count as relevant, and relevant
+    # documents share the top_k slots (see retrieval.py), so a large clearly-typed document
+    # cannot crowd out a less legible one that matches the question better.
+    relevance_margin: float = 0.05
 
     # OCR / HTR (build step 4)
     tesseract_cmd: str = ""  # path to tesseract.exe if it is not on PATH

@@ -73,7 +73,11 @@ def build_prompt(question: str, chunks: list[RecognizedChunk], history: list[tup
         )
         prompt = (
             "Earlier in this conversation (use it only to understand what the new question refers to; "
-            f"take facts from the context passages, not from here):\n{turns}\n\n{prompt}"
+            f"take facts from the context passages, not from here):\n{turns}\n\n"
+            "If the new question refers back to something (e.g. 'they', 'it', 'that'), answer about "
+            "that same subject only. If the context passages do not cover that subject, reply with "
+            f"exactly {NOT_FOUND}; do not answer about a different subject the passages happen to cover.\n\n"
+            f"{prompt}"
         )
     return prompt
 

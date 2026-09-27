@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DocBlendAI</title>
+<link rel="icon" href="data:,">
 <style>
   :root {
     color-scheme: light;
@@ -266,6 +267,7 @@
 </div>
 <div class="scrim" id="scrim"></div>
 
+
 <script>
 const WHY = {
   Certain: "Strong match in clearly readable text.",
@@ -395,7 +397,7 @@ function citation(s, n) {
     let text = `Page ${s.page}`;
     if (s.first_line) text += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
     const link = el("button", { class: "cite-page", type: "button", title: "Show this page" }, text);
-    link.addEventListener("click", () => openPreview(s.doc_id, s.page, true).catch((err) => alert(err.message)));
+    link.addEventListener("click", () => openPreview(s.doc_id, s.page, true).catch((err) => setStatus("upload-status", err.message, "error")));
     where.append(" · ", link);
   }
   return el("li", { class: "cite" },
@@ -495,7 +497,6 @@ $("next-page").addEventListener("click", () => { view.page++; renderPreview(); }
 $("close-preview").addEventListener("click", closePreview);
 
 async function deleteDoc(d, button) {
-  if (!confirm(`Remove "${docLabel(d.doc_id)}"? It is removed from DocBlendAI only; your original file is not touched.`)) return;
   button.disabled = true;
   try {
     await api(`/documents/${d.doc_id}`, { method: "DELETE" });
