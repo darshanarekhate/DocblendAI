@@ -33,6 +33,10 @@ SYSTEM_INSTRUCTION = (
     f"passages do not contain the answer, reply with exactly {NOT_FOUND}."
 )
 
+# Conversation memory for follow-up questions (chat): how much of the past goes into the prompt.
+MAX_HISTORY_TURNS = 3
+MAX_HISTORY_ANSWER_CHARS = 600
+
 # Passages below this confidence are flagged to the model as possibly misrecognized.
 LOW_CONFIDENCE = 0.95
 
@@ -58,9 +62,20 @@ def _passage_header(i: int, chunk: RecognizedChunk) -> str:
     return f"[{i}] ({'; '.join(notes)})"
 
 
-def build_prompt(question: str, chunks: list[RecognizedChunk]) -> str:
+def build_prompt(question: str, chunks: list[RecognizedChunk], history: list[tuple[str, str]] | None = None) -> str:
     context = "\n\n".join(f"{_passage_header(i, c)}\n{c.text}" for i, c in enumerate(chunks, 1))
-    return f"Context passages:\n{context}\n\nQuestion: {question}"
+    prompt = f"Context passages:\n{context}\n\nQuestion: {question}"
+    if history:
+        # Only the last few turns, trimmed: enough to resolve "it" / "that one", not a second source.
+        turns = "\n".join(
+            f"Q: {q}\nA: {a if len(a) <= MAX_HISTORY_ANSWER_CHARS else a[:MAX_HISTORY_ANSWER_CHARS] + '…'}"
+            for q, a in history[-MAX_HISTORY_TURNS:]
+        )
+        prompt = (
+            "Earlier in this conversation (use it only to understand what the new question refers to; "
+            f"take facts from the context passages, not from here):\n{turns}\n\n{prompt}"
+        )
+    return prompt
 
 
 def _generate(prompt: str) -> str:
@@ -113,8 +128,12 @@ def generate_answer(
     query: Query,
     chunks: list[RecognizedChunk],
     reliability_label: ReliabilityLabel,
+    history: list[tuple[str, str]] | None = None,
 ) -> Answer:
     """Generate a grounded answer from the retrieved chunks.
+
+    history: earlier (question, answer) turns of the same chat, so follow-ups
+    like "explain that in more detail" can be understood.
 
     If the model finds no answer in the chunks, the label is lowered to at
     least Uncertain, whatever retrieval scores suggested.
@@ -123,7 +142,7 @@ def generate_answer(
     if not chunks:
         return Answer(answer_id=answer_id, answer_text=NO_DOCUMENTS_ANSWER, reliability_label=reliability_label)
 
-    text = _generate(build_prompt(query.question_text, chunks))
+    text = _generate(build_prompt(query.question_text, chunks, history))
     # Lite models sometimes wrap the marker in punctuation, quotes, or bold.
     if text.strip(" .\"'`*").upper() == NOT_FOUND:
         text = NOT_FOUND_ANSWER
