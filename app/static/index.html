@@ -283,8 +283,37 @@ function renderAnswer(text) {
   return div;
 }
 
+// Where the DocBlendAI server is. Normally the page is served by it (same origin), but if
+// index.html was opened directly (file://) or from an editor's live preview, fall back to
+// the default local server. Checked with /health, and re-checked after a failed request.
+const LOCAL_SERVER = "http://127.0.0.1:8000";
+const SERVER_DOWN = "Cannot reach the DocBlendAI server. Start it with: " +
+  "venv/Scripts/python -m uvicorn app.main:app --port 8000, then open http://localhost:8000";
+let apiBase = null;
+
+async function findServer() {
+  if (apiBase !== null) return apiBase;
+  const candidates = location.protocol.startsWith("http") ? [location.origin, LOCAL_SERVER] : [LOCAL_SERVER];
+  for (const base of candidates) {
+    try {
+      const resp = await fetch(`${base}/health`);
+      if (resp.ok && (await resp.json()).status === "ok") return (apiBase = base === location.origin ? "" : base);
+    } catch { /* not this one; try the next */ }
+  }
+  throw new Error(SERVER_DOWN);
+}
+
+const url = (path) => `${apiBase || ""}${path}`;
+
 async function api(path, options, withStatus = false) {
-  const resp = await fetch(path, options);
+  await findServer();
+  let resp;
+  try {
+    resp = await fetch(url(path), options);
+  } catch {
+    apiBase = null;  // the server went away; look for it again next time
+    throw new Error(SERVER_DOWN);
+  }
   const body = await resp.json().catch(() => ({}));
   if (!resp.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${resp.status})`);
   return withStatus ? { body, status: resp.status } : body;
@@ -320,7 +349,7 @@ function renderPreview() {
     box.replaceChildren(el("pre", {}, info.text_pages[page - 1] || "(This page has no text.)"));
     open.hidden = true;
   } else {
-    const src = `/documents/${docId}/pages/${page}`;
+    const src = url(`/documents/${docId}/pages/${page}`);
     box.replaceChildren(el("img", { src, alt: `${docLabel(docId)}, page ${page}` }));
     open.href = src; open.hidden = false;
   }

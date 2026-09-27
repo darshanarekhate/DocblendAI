@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.config import settings
@@ -38,6 +39,17 @@ app = FastAPI(
     description="Confidence-aware multi-format document QA assistant.",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# The UI is normally served at "/", but people also open app/static/index.html directly
+# (double-click: origin "null") or through an editor's live preview on another localhost
+# port. Let those local pages call the API; nothing outside this machine is allowed.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["null"],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(upload.router)
