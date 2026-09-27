@@ -169,7 +169,7 @@ def _ingest(doc_id: str, path: Path, format_hint: FormatType | None, db: Session
     except embedder.EmbeddingError as e:
         logger.error("Embedding failed for %s: %s", doc_id, e)
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Embedding service failed; try again later")
-    vector_store.add_chunks(doc_id, chunks, {chunk.chunk_id: page for page, chunk in numbered})
+    vector_store.add_chunks(doc_id, chunks, {chunk.chunk_id: loc for loc, chunk in numbered})
 
     try:
         db.add(DocumentORM(**document.model_dump()))
