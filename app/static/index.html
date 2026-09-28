@@ -78,7 +78,7 @@
   .chosen { max-width: 100%; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chosen.set { color: var(--ink); font-weight: 600; }
   .upload .row { display: flex; gap: 8px; margin-top: 10px; }
-  .upload .row .btn { flex: 1; }
+  .upload .row select { flex: 1; min-width: 0; }
   .upload .auto { margin-top: 8px; font-size: 12.5px; color: var(--ink-3); text-align: center; }
   .notice { margin: 10px 18px 0; padding: 8px 10px; border-radius: 6px; font-size: 13.5px; color: var(--ink-2); background: var(--soft); }
   .notice:empty { display: none; }
@@ -86,7 +86,8 @@
   .notice.error { color: var(--red); background: var(--red-soft); }
 
   .list-title { margin: 18px 18px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
-  .doc-list { list-style: none; margin: 0; padding: 0 10px 14px; overflow-y: auto; flex: 1; }
+  .docs { overflow-y: auto; }   /* short screens: the upload controls must stay reachable */
+  .doc-list { list-style: none; margin: 0; padding: 0 10px 14px; }
   .doc { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 6px; }
   .doc:hover { background: var(--soft); }
   .type { flex: none; width: 42px; padding: 3px 0; border-radius: 4px; font-size: 10.5px; font-weight: 700; text-align: center; letter-spacing: .03em;
@@ -210,9 +211,17 @@
       </div>
       <input type="file" id="file" class="sr-only" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
       <div class="row">
+        <label class="sr-only" for="format-hint">Document type</label>
+        <select id="format-hint" title="Document type">
+          <option value="" disabled selected>Document type…</option>
+          <option value="typed">Typed</option>
+          <option value="scanned">Scanned / printed</option>
+          <option value="handwritten">Handwritten</option>
+          <option value="auto">Not sure (detect, slower)</option>
+        </select>
         <button type="submit" class="btn" id="upload-btn">Upload</button>
       </div>
-      <p class="auto">Typed, scanned or handwritten is detected automatically.</p>
+      <p class="auto" id="type-note">Choosing the type makes uploading faster.</p>
     </form>
     <p class="notice" id="upload-notice" role="status"></p>
     <h3 class="list-title">Your files</h3>
@@ -357,6 +366,8 @@ const Docs = {
   async upload(file) {
     const form = new FormData();
     form.append("file", file);
+    const hint = $("format-hint").value;
+    if (hint && hint !== "auto" && !this.alwaysTyped(file)) form.append("format_hint", hint);
     const btn = $("upload-btn");
     btn.disabled = true; btn.textContent = "Uploading…";
     this.notice("Reading the file. Scanned and handwritten pages can take a minute.");
@@ -364,17 +375,29 @@ const Docs = {
       const { body: doc, status } = await Server.call("/upload", { method: "POST", body: form });
       await this.load();
       if (status === 200) this.notice(`Already uploaded as ${this.nameOf(doc.doc_id)}, so it was not added again.`);
-      else this.notice(`Added ${this.nameOf(doc.doc_id)}. Detected as ${FORMAT[doc.format_type].toLowerCase()}, ${plural(doc.page_count, "page")}.`, "ok");
+      else this.notice(`Added ${this.nameOf(doc.doc_id)}. Read as ${FORMAT[doc.format_type].toLowerCase()}, ${plural(doc.page_count, "page")}.`, "ok");
       $("upload-form").reset(); this.showChosen();
     } catch (e) {
       this.notice(e.message, "error");
     } finally { btn.disabled = false; btn.textContent = "Upload"; }
   },
 
+  // Word, PowerPoint and .txt files are always typed; images never are (they have no text layer).
+  extOf(file) { return file.name.split(".").pop().toLowerCase(); },
+  alwaysTyped(file) { return ["docx", "pptx", "txt"].includes(this.extOf(file)); },
+
   showChosen() {
-    const f = $("file").files[0], c = $("chosen");
+    const f = $("file").files[0], c = $("chosen"), select = $("format-hint");
     c.textContent = f ? f.name : "No file chosen";
     c.classList.toggle("set", !!f);
+    const typedOnly = !!f && this.alwaysTyped(f);
+    const image = !!f && !typedOnly && this.extOf(f) !== "pdf";
+    if (typedOnly) select.value = "typed";
+    else if (select.disabled || (select.value === "typed" && image)) select.value = "";   // don't carry over a forced "typed"
+    select.disabled = typedOnly;
+    select.querySelector('option[value="typed"]').disabled = image;
+    $("type-note").textContent = typedOnly ? "Word, PowerPoint and text files are always typed."
+      : "Choosing the type makes uploading faster.";
   },
 
   init() {
@@ -383,6 +406,10 @@ const Docs = {
       e.preventDefault();
       const file = $("file").files[0];
       if (!file) { this.notice("Choose a file first.", "error"); return; }
+      if (!$("format-hint").value && !this.alwaysTyped(file)) {
+        this.notice("Choose the document type: typed, scanned or handwritten.", "error");
+        $("format-hint").focus(); return;
+      }
       this.upload(file);
     });
     // A file dropped anywhere on the page goes to the upload form (instead of the browser opening it).
