@@ -8,7 +8,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from app.config import settings
-from app.models.schemas import FormatType, RecognizedChunk
+from app.models.schemas import Document, FormatType, RecognizedChunk
 from app.modules import confidence_capture, format_detection, htr_extractor, ocr_extractor, vector_store
 from app.modules.pdf_render import render_pages
 from tests.conftest import TYPED_PAGE, fake_embed
@@ -187,6 +187,47 @@ def test_detect_confident_ocr_skips_htr(pdf_file, fake_ocr, monkeypatch) -> None
 
 def test_detect_text_layer_skips_ocr(pdf_file, fake_ocr) -> None:
     assert format_detection.detect_format(str(pdf_file([TYPED_PAGE]))) is FormatType.TYPED
+    assert fake_ocr.calls == 0
+
+
+# --- Detection's sample pages are not read twice ----------------------------------
+
+
+def test_render_pages_can_start_after_the_first_pages(pdf_file) -> None:
+    path = str(pdf_file(["a", "b", "c"]))
+    assert len(list(render_pages(path, dpi=36, first_page=2))) == 1
+    assert list(render_pages(path, dpi=36, max_pages=2, first_page=2)) == []
+
+
+def test_detected_scan_is_ocred_once_per_page(pdf_file, fake_ocr) -> None:
+    fake_ocr.text, fake_ocr.conf = "Printed words", 0.92
+    path = str(pdf_file(["", "", "", "", ""]))
+
+    format_type, already_read = format_detection.resolve(path, None)
+    pages = format_detection.extract(Document(doc_id="d", file_path=path, format_type=format_type, page_count=5), already_read)
+
+    assert format_type is FormatType.SCANNED
+    assert len(pages) == 5
+    assert fake_ocr.calls == 5  # 2 while detecting + the 3 after them, not 2 + 5
+
+
+def test_detected_handwriting_reuses_the_htr_sample(pdf_file, fake_ocr, monkeypatch) -> None:
+    fake_ocr.text, fake_ocr.conf = "sc ribb le", 0.31
+    htr_calls = []
+    monkeypatch.setattr(htr_extractor, "htr_image", lambda image: htr_calls.append(1) or ("scribble notes", 0.8))
+    path = str(pdf_file(["", "", ""]))
+
+    format_type, already_read = format_detection.resolve(path, None)
+    pages = format_detection.extract(Document(doc_id="d", file_path=path, format_type=format_type, page_count=3), already_read)
+
+    assert format_type is FormatType.HANDWRITTEN
+    assert pages == [("scribble notes", 0.8)] * 3
+    assert len(htr_calls) == 3
+
+
+def test_chosen_type_skips_detection(pdf_file, fake_ocr, fake_htr) -> None:
+    fake_htr.text, fake_htr.conf = "notes", 0.7
+    assert format_detection.resolve(str(pdf_file(["", ""])), FormatType.HANDWRITTEN) == (FormatType.HANDWRITTEN, [])
     assert fake_ocr.calls == 0
 
 

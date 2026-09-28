@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # (Tesseract when installed, otherwise docTR).
     ocr_engine: str = "auto"
     calibration_file: Path = DATA_DIR / "calibration.json"
+    # Load the OCR/HTR models in the background when the server starts, so the first
+    # scanned or handwritten upload does not wait ~15 s for them.
+    preload_models: bool = True
 
     database_url: str = f"sqlite:///{(DATA_DIR / 'docblendai.db').as_posix()}"
     chroma_dir: Path = DATA_DIR / "chroma_db"
