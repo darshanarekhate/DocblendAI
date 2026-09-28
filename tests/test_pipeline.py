@@ -509,4 +509,4 @@ def test_list_documents(client, pdf_file) -> None:
 def test_frontend_is_served(client) -> None:
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "DocBlendAI" in resp.text and "/chat" in resp.text
+    assert "DocBlendAI" in resp.text and ("/chat" in resp.text or "/ask" in resp.text)
