@@ -7,260 +7,143 @@
 <link rel="icon" href="data:,">
 <style>
   :root {
-    color-scheme: light;
-    --bg: #f3f6fa;          /* page background: light cool grey */
-    --panel: #ffffff;       /* panels */
-    --soft: #f7f9fc;        /* inputs, drop zone, sources */
-    --line: #e1e7ef;        /* borders */
-    --line-2: #cdd6e2;
-    --ink: #1f2a37;         /* text */
-    --ink-2: #5b6778;       /* secondary text */
-    --ink-3: #8a95a5;       /* hints */
-    --blue: #3a6ea5;        /* buttons, links */
+    --bg: #f4f6f9;
+    --panel: #ffffff;
+    --line: #dfe4ea;
+    --ink: #1f2a37;
+    --muted: #6b7684;
+    --blue: #3a6ea5;
     --blue-dark: #2d5985;
-    --blue-soft: #e8f0f9;   /* question bubble, drag highlight */
-    --green: #2f7d5b;       /* confidence scores, "Certain" */
-    --green-soft: #e4f3ec;
+    --blue-soft: #e8f0f9;
+    --green: #2f7d5b;
     --amber: #95650c;
-    --amber-soft: #faf0dc;
     --slate: #556173;
-    --slate-soft: #eceff4;
     --red: #b23b2a;
-    --red-soft: #fbe9e6;
-    --sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", sans-serif;
+    --sans: Calibri, Carlito, "Segoe UI", sans-serif;                   /* interface text */
+    --serif: "Times New Roman", Times, "Liberation Serif", serif;       /* headings and answers */
   }
-
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
-  h1, h2, h3, p { margin: 0; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--sans); }
+  h1, h2, p { margin: 0; }
+  h1, h2 { font-family: var(--serif); }
   button, input, select, textarea { font: inherit; color: inherit; }
   a { color: var(--blue); }
-  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-  [hidden] { display: none !important; }
-  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
-  /* ---- buttons ---- */
-  .btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 16px; border: 1px solid var(--blue);
-         border-radius: 6px; background: var(--blue); color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; }
-  .btn:hover:not(:disabled) { background: var(--blue-dark); border-color: var(--blue-dark); }
-  .btn:disabled { opacity: .55; cursor: not-allowed; }
-  .btn.plain { background: var(--panel); color: var(--ink); border-color: var(--line-2); font-weight: 500; }
-  .btn.plain:hover:not(:disabled) { background: var(--soft); border-color: var(--ink-3); }
-  .textlink { border: 0; background: none; padding: 0; color: var(--blue); cursor: pointer; font-size: inherit; }
-  .textlink:hover { text-decoration: underline; text-underline-offset: 2px; }
-  .textlink.quiet { color: var(--ink-3); }
-  .textlink.quiet:hover { color: var(--red); }
-  select { height: 36px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel); font-size: 14px; }
+  button, .choose { height: 36px; padding: 0 14px; border: 1px solid var(--blue); border-radius: 6px; background: var(--blue); color: #fff;
+                    font-size: 15px; cursor: pointer; }
+  button:hover:not(:disabled) { background: var(--blue-dark); }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .choose { display: inline-flex; align-items: center; background: #fff; color: var(--ink); border-color: var(--line); }
+  .link { height: auto; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; }
+  .link:hover:not(:disabled) { background: none; color: var(--red); }
+  select { height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 15px; }
 
-  /* ---- frame ---- */
-  .top { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .mark { width: 28px; height: 28px; border-radius: 6px; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; }
-  .wordmark { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
-  .top .note { font-size: 13.5px; color: var(--ink-3); padding-left: 14px; border-left: 1px solid var(--line); }
-  .top .grow { flex: 1; }
-  .tabs { display: none; }
-  .layout { height: calc(100% - 56px); display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; padding: 16px; }
-  .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .panel-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px; border-bottom: 1px solid var(--line); }
-  .panel-head h2 { font-size: 15px; font-weight: 600; }
-  .panel-head .sub { font-size: 12.5px; color: var(--ink-3); }
+  header { padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 24px; font-weight: 700; }
 
-  /* ---- documents panel ---- */
-  .upload { margin: 16px 18px 0; }
-  .drop { display: block; padding: 18px 14px; border: 1.5px dashed var(--line-2); border-radius: 8px; background: var(--soft); text-align: center;
-          transition: border-color .12s, background-color .12s; }
-  .upload.dragging .drop { border-color: var(--blue); background: var(--blue-soft); }
-  .drop .big { font-weight: 600; font-size: 14.5px; }
-  .drop .small { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
-  .drop .pick { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .chosen { max-width: 100%; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chosen.set { color: var(--ink); font-weight: 600; }
-  .upload .row { display: flex; gap: 8px; margin-top: 10px; }
-  .upload .row select { flex: 1; min-width: 0; }
-  .upload .auto { margin-top: 8px; font-size: 12.5px; color: var(--ink-3); text-align: center; }
-  .notice { margin: 10px 18px 0; padding: 8px 10px; border-radius: 6px; font-size: 13.5px; color: var(--ink-2); background: var(--soft); }
-  .notice:empty { display: none; }
-  .notice.ok { color: var(--green); background: var(--green-soft); }
-  .notice.error { color: var(--red); background: var(--red-soft); }
+  main { height: calc(100% - 61px); display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; padding: 16px; }
+  section { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  h2 { padding: 10px 16px; font-size: 18px; border-bottom: 1px solid var(--line); }
 
-  .list-title { margin: 18px 18px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
-  .docs { overflow-y: auto; }   /* short screens: the upload controls must stay reachable */
-  .doc-list { list-style: none; margin: 0; padding: 0 10px 14px; }
-  .doc { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 6px; }
-  .doc:hover { background: var(--soft); }
-  .type { flex: none; width: 42px; padding: 3px 0; border-radius: 4px; font-size: 10.5px; font-weight: 700; text-align: center; letter-spacing: .03em;
-          color: var(--slate); background: var(--slate-soft); }
-  .type.pdf { color: var(--red); background: var(--red-soft); }
-  .type.docx, .type.pptx { color: var(--blue); background: var(--blue-soft); }
-  .type.img { color: var(--green); background: var(--green-soft); }
+  /* documents */
+  .docs { overflow-y: auto; }
+  form.upload { padding: 16px; display: grid; gap: 10px; }
+  form.upload.dragging { background: var(--blue-soft); }
+  .file-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  #chosen { min-width: 0; font-size: 14.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .type-row { display: flex; gap: 8px; }
+  .type-row select { flex: 1; min-width: 0; }
+  #status { padding: 0 16px 12px; font-size: 14.5px; color: var(--muted); }
+  #status:empty { display: none; }
+  #status.ok { color: var(--green); }
+  #status.error { color: var(--red); }
+  #doc-list { list-style: none; margin: 0; padding: 0 16px 16px; }
+  #doc-list li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
   .doc-main { flex: 1; min-width: 0; }
-  .doc-name { display: block; max-width: 100%; border: 0; background: none; padding: 0; text-align: left; cursor: pointer;
-              font-size: 14px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .doc-name:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
-  .doc-meta { font-size: 12.5px; color: var(--ink-3); }
-  .doc .textlink { font-size: 12.5px; flex: none; }
-  .empty { padding: 10px 8px; font-size: 14px; color: var(--ink-3); }
+  .doc-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-meta { font-size: 13.5px; color: var(--muted); }
+  #doc-list .empty { color: var(--muted); font-size: 15px; }
 
-  /* ---- chat panel ---- */
-  .messages { flex: 1; overflow-y: auto; background: var(--panel); }
-  .thread { max-width: 760px; margin: 0 auto; padding: 24px 24px 12px; }
-  .intro { max-width: 520px; margin: 40px auto 0; text-align: center; color: var(--ink-2); }
-  .intro h2 { font-size: 20px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
-  .tiers { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
-  .tier { font-size: 13px; color: var(--ink-2); }
-
-  .entry { margin-bottom: 22px; }
-  .q { width: fit-content; max-width: 80%; margin-left: auto; padding: 9px 14px; border-radius: 10px 10px 2px 10px; background: var(--blue-soft);
-       color: var(--ink); white-space: pre-wrap; }
-  .bubble { margin-top: 10px; max-width: 92%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px 10px 10px 2px; background: var(--panel); }
-  .a { font-size: 15px; line-height: 1.65; }
-  .a p { margin-bottom: 10px; }
+  /* chat */
+  #messages { flex: 1; overflow-y: auto; padding: 16px; }
+  .intro { color: var(--muted); }
+  .entry { margin-bottom: 20px; }
+  .q { width: fit-content; max-width: 80%; margin-left: auto; padding: 8px 12px; border-radius: 8px; background: var(--blue-soft); white-space: pre-wrap; }
+  .answer { margin-top: 8px; max-width: 92%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; }
+  .a { font-family: var(--serif); font-size: 17px; line-height: 1.55; }
+  .a p { margin-bottom: 8px; }
   .a p:last-child { margin-bottom: 0; }
-  .a ul, .a ol { margin: 0 0 10px; padding-left: 22px; }
-  .a li { margin-bottom: 3px; }
-  .entry.pending .a { color: var(--ink-3); }
-  .entry.failed .bubble { border-color: #f0c9c1; background: var(--red-soft); }
+  .a ul, .a ol { margin: 0 0 8px; padding-left: 22px; }
+  .entry.pending .a { color: var(--muted); }
   .entry.failed .a { color: var(--red); }
+  .label { margin-top: 10px; font-size: 14.5px; color: var(--muted); }
+  .label b { color: var(--tone); }
+  .Certain { --tone: var(--green); }
+  .Moderate { --tone: var(--amber); }
+  .Uncertain { --tone: var(--slate); }
+  .Unreadable { --tone: var(--red); }
+  .sources { margin-top: 6px; font-size: 14.5px; color: var(--muted); }
+  .sources summary { cursor: pointer; color: var(--blue); width: max-content; }
+  .sources ol { margin: 6px 0 0; padding-left: 20px; }
+  .sources em { font-style: normal; color: var(--green); }
 
-  .verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line);
-             font-size: 13px; color: var(--ink-2); }
-  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--tone); background: var(--tone-soft); }
-  .Certain { --tone: var(--green); --tone-soft: var(--green-soft); }
-  .Moderate { --tone: var(--amber); --tone-soft: var(--amber-soft); }
-  .Uncertain { --tone: var(--slate); --tone-soft: var(--slate-soft); }
-  .Unreadable { --tone: var(--red); --tone-soft: var(--red-soft); }
+  form.ask { display: flex; gap: 8px; align-items: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); }
+  form.ask textarea { flex: 1; min-height: 40px; max-height: 160px; padding: 8px 10px; resize: none; line-height: 1.45;
+                      border: 1px solid var(--line); border-radius: 6px; overflow-y: hidden; }
+  form.ask textarea:focus { outline: none; border-color: var(--blue); }
+  form.ask button { height: 40px; }
 
-  .sources { margin-top: 8px; font-size: 13px; }
-  .sources > summary { cursor: pointer; color: var(--blue); width: max-content; font-weight: 500; }
-  .sources ol { margin: 8px 0 0; padding: 0; list-style: none; }
-  .sources li { padding: 8px 10px; margin-top: 6px; border-radius: 6px; background: var(--soft); }
-  .ref { color: var(--ink-3); font-variant-numeric: tabular-nums; margin-right: 6px; }
-  .src-name { font-weight: 600; }
-  .scores { color: var(--ink-3); }
-  .scores em { font-style: normal; color: var(--green); font-weight: 600; }
-  .sources details summary { margin-top: 2px; }
-  .sources blockquote { margin: 6px 0 2px; padding: 6px 10px; border-left: 2px solid var(--line-2); background: var(--panel); color: var(--ink-2);
-                        white-space: pre-wrap; max-height: 170px; overflow: auto; font-size: 13px; }
-
-  .composer { border-top: 1px solid var(--line); background: var(--soft); }
-  .composer form { max-width: 760px; margin: 0 auto; padding: 12px 24px 4px; display: flex; gap: 10px; align-items: flex-end; }
-  .composer textarea { flex: 1; min-height: 42px; max-height: 160px; padding: 10px 12px; resize: none; line-height: 1.45;
-                       border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); font-size: 15px; overflow-y: hidden; }
-  .composer textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
-  .composer .btn { height: 42px; padding: 0 20px; }
-  .composer .hint { max-width: 760px; margin: 0 auto; padding: 0 24px 10px; font-size: 12px; color: var(--ink-3); }
-
-  /* ---- preview window ---- */
-  dialog.preview { width: min(780px, calc(100% - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
-  dialog.preview::backdrop { background: rgba(31, 42, 55, .35); }
-  .pv { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
-  .pv-head, .pv-foot { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
-  .pv-head { border-bottom: 1px solid var(--line); }
-  .pv-head h2 { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pv-body { overflow: auto; background: var(--bg); padding: 14px; }
-  .pv-body img { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #fff; }
-  .pv-body pre { margin: 0; padding: 18px 20px; border: 1px solid var(--line); background: #fff; font: 15px/1.7 var(--sans); white-space: pre-wrap; }
-  .pv-foot { border-top: 1px solid var(--line); justify-content: space-between; font-size: 13.5px; color: var(--ink-2); }
-  .pv-foot .btn { height: 32px; }
-
-  /* ---- phones: Chat | Files ---- */
-  @media (max-width: 860px) {
-    .top { padding: 0 12px; gap: 10px; }
-    .top .note { display: none; }
-    .tabs { display: flex; margin-left: auto; border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden; }
-    .tabs button { height: 32px; padding: 0 12px; border: 0; background: var(--panel); font-size: 14px; cursor: pointer; white-space: nowrap; }
-    .tabs button + button { border-left: 1px solid var(--line-2); }
-    .tabs button[aria-selected="true"] { background: var(--blue); color: #fff; }
-    .top .grow { display: none; }
-    .layout { grid-template-columns: minmax(0, 1fr); padding: 10px; gap: 10px; }
-    body[data-tab="chat"] .docs, body[data-tab="docs"] .chat { display: none; }
-    .thread { padding: 16px 14px 8px; }
-    .q { max-width: 90%; }
-    .bubble { max-width: 100%; }
-    .composer form { padding: 10px 12px 4px; }
-    .composer .hint { padding: 0 12px 8px; }
+  /* phones: documents on top, chat below */
+  @media (max-width: 800px) {
+    main { height: auto; grid-template-columns: minmax(0, 1fr); padding: 10px; gap: 10px; }
+    .chat { min-height: 75vh; }
+    .q, .answer { max-width: 100%; }
   }
 </style>
 </head>
-<body data-tab="chat">
+<body>
 
-<header class="top">
-  <div class="brand"><span class="mark" aria-hidden="true">D</span><span class="wordmark">DocBlendAI</span></div>
-  <span class="note">Ask questions about your typed, scanned and handwritten documents</span>
-  <span class="grow"></span>
-  <nav class="tabs" role="tablist" aria-label="View">
-    <button type="button" role="tab" id="tab-chat" aria-selected="true">Chat</button>
-    <button type="button" role="tab" id="tab-docs" aria-selected="false">Files</button>
-  </nav>
-</header>
+<header><h1>DocBlendAI</h1></header>
 
-<div class="layout">
-  <!-- Documents -->
-  <aside class="panel docs" aria-labelledby="docs-title">
-    <div class="panel-head"><h2 id="docs-title">Documents</h2><span class="sub" id="doc-count"></span></div>
+<main>
+  <section class="docs" aria-labelledby="docs-title">
+    <h2 id="docs-title">Documents</h2>
     <form class="upload" id="upload-form">
-      <div class="drop">
-        <p class="big">Drop a file here</p>
-        <p class="small">PDF, Word, PowerPoint, text or an image</p>
-        <div class="pick">
-          <label class="btn plain" for="file">Choose file…</label>
-          <span class="chosen" id="chosen">No file chosen</span>
-        </div>
+      <div class="file-row">
+        <label class="choose" for="file">Choose file</label>
+        <span id="chosen">or drop a file here</span>
       </div>
       <input type="file" id="file" class="sr-only" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
-      <div class="row">
+      <div class="type-row">
         <label class="sr-only" for="format-hint">Document type</label>
-        <select id="format-hint" title="Document type">
-          <option value="" disabled selected>Document type…</option>
+        <select id="format-hint">
+          <option value="" disabled selected>Document type</option>
           <option value="typed">Typed</option>
           <option value="scanned">Scanned / printed</option>
           <option value="handwritten">Handwritten</option>
           <option value="auto">Detect automatically</option>
         </select>
-        <button type="submit" class="btn" id="upload-btn">Upload</button>
+        <button type="submit" id="upload-btn">Upload</button>
       </div>
-      <p class="auto" id="type-note">Choosing the type makes uploading faster.</p>
     </form>
-    <p class="notice" id="upload-notice" role="status"></p>
-    <h3 class="list-title">Your files</h3>
-    <ul class="doc-list" id="doc-list"></ul>
-  </aside>
+    <p id="status" role="status"></p>
+    <ul id="doc-list"></ul>
+  </section>
 
-  <!-- Chat -->
-  <main class="panel chat" aria-labelledby="chat-title">
-    <div class="panel-head"><h2 id="chat-title">Chat</h2><span class="sub">Answers come only from your uploaded files</span></div>
-    <div class="messages" id="messages"><div class="thread" id="thread"></div></div>
-    <div class="composer">
-      <form id="ask-form">
-        <label class="sr-only" for="question">Your question</label>
-        <textarea id="question" rows="1" placeholder="Ask a question about your documents…"></textarea>
-        <button type="submit" class="btn" id="ask-btn">Ask</button>
-      </form>
-      <p class="hint">Enter to send, Shift + Enter for a new line. Follow-up questions work too.</p>
-    </div>
-  </main>
-</div>
-
-<!-- Preview window -->
-<dialog class="preview" id="preview" aria-labelledby="preview-title">
-  <div class="pv">
-    <div class="pv-head">
-      <h2 id="preview-title"></h2>
-      <button type="button" class="textlink" id="preview-close">Close</button>
-    </div>
-    <div class="pv-body" id="preview-body"></div>
-    <div class="pv-foot">
-      <button type="button" class="btn plain" id="page-prev">← Previous</button>
-      <span><span id="page-where"></span> · <a id="page-full" target="_blank" rel="noopener">open full size</a></span>
-      <button type="button" class="btn plain" id="page-next">Next →</button>
-    </div>
-  </div>
-</dialog>
+  <section class="chat" aria-labelledby="chat-title">
+    <h2 id="chat-title">Chat</h2>
+    <div id="messages"></div>
+    <form class="ask" id="ask-form">
+      <label class="sr-only" for="question">Your question</label>
+      <textarea id="question" rows="1" placeholder="Ask a question about your documents"></textarea>
+      <button type="submit" id="ask-btn">Ask</button>
+    </form>
+  </section>
+</main>
 
 <script>
-/* ---------- helpers ---------- */
 const $ = (id) => document.getElementById(id);
 function h(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -270,14 +153,13 @@ function h(tag, attrs = {}, ...children) {
 }
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/* ---------- server connection ----------
-   Normally the page is served by the DocBlendAI server. If index.html is opened
-   directly (or from an editor preview), fall back to the default local server. */
+/* ---------- server ----------
+   The page is normally served by the DocBlendAI server; if index.html is opened
+   directly, fall back to the default local server. */
 const Server = {
   LOCAL: "http://127.0.0.1:8000",
   DOWN: "Cannot reach the DocBlendAI server. Start it with: venv/Scripts/python -m uvicorn app.main:app --port 8000, then open http://localhost:8000",
   base: null,
-
   async find() {
     if (this.base !== null) return;
     const candidates = location.protocol.startsWith("http") ? [location.origin, this.LOCAL] : [this.LOCAL];
@@ -290,7 +172,6 @@ const Server = {
     throw new Error(this.DOWN);
   },
   url(path) { return `${this.base || ""}${path}`; },
-
   async call(path, options = {}) {
     await this.find();
     let resp;
@@ -300,51 +181,48 @@ const Server = {
     if (!resp.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${resp.status})`);
     return { body, status: resp.status };
   },
-  async get(path) { return (await this.call(path)).body; },
-  async post(path, data) {
-    return (await this.call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })).body;
-  },
 };
 
-/* ---------- documents: upload, list, remove ---------- */
+/* ---------- documents ---------- */
 const FORMAT = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
-const TEXT_TYPES = ["pdf", "docx", "pptx", "txt"];
+const TEXT_FILES = ["docx", "pptx", "txt"];   // always typed, and have no page images
+const extOf = (name) => name.split(".").pop().toLowerCase();
 
 const Docs = {
   names: {},   // doc_id -> original file name
 
   nameOf(id) { return this.names[id] || id.slice(0, 8); },
   hasAny() { return Object.keys(this.names).length > 0; },
-  notice(text, kind = "") { const n = $("upload-notice"); n.className = `notice ${kind}`.trim(); n.textContent = text; },
+  hasPages(id) { return !TEXT_FILES.includes(extOf(this.nameOf(id))); },
+  pageUrl(id, page) { return Server.url(`/documents/${id}/pages/${page}`); },
+  status(text, kind = "") { const s = $("status"); s.className = kind; s.textContent = text; },
 
-  fileName(doc) {  // uploads are stored as "<doc_id>_<original name>.<ext>"
+  fileName(doc) {  // stored as "<doc_id>_<original name>"
     const base = doc.file_path.split(/[\\/]/).pop();
     return base.startsWith(doc.doc_id + "_") ? base.slice(doc.doc_id.length + 1) : base;
   },
 
   async load() {
-    const docs = await Server.get("/documents");
+    const docs = (await Server.call("/documents")).body;
     this.names = {};
     const list = $("doc-list");
     list.replaceChildren();
-    $("doc-count").textContent = docs.length ? plural(docs.length, "file") : "";
-    if (!docs.length) list.append(h("li", { class: "empty" }, "Nothing uploaded yet."));
+    if (!docs.length) list.append(h("li", { class: "empty" }, "No documents yet."));
     for (const doc of docs) list.append(this.row(doc));
-    Chat.refreshIntro();
+    Chat.intro();
   },
 
   row(doc) {
     const name = this.fileName(doc);
     this.names[doc.doc_id] = name;
-    const ext = name.split(".").pop().toLowerCase();
-    const type = TEXT_TYPES.includes(ext) ? ext : "img";
-    const open = h("button", { type: "button", class: "doc-name", title: `Open ${name}` }, name);
-    open.addEventListener("click", () => Preview.open(doc.doc_id).catch((e) => this.notice(e.message, "error")));
-    const remove = h("button", { type: "button", class: "textlink quiet", "aria-label": `Remove ${name}` }, "Remove");
+    // PDFs and images open their first page in a new tab; Word/PowerPoint/text have no page images.
+    const title = this.hasPages(doc.doc_id)
+      ? h("a", { class: "doc-name", href: this.pageUrl(doc.doc_id, 1), target: "_blank", rel: "noopener" }, name)
+      : h("span", { class: "doc-name" }, name);
+    const remove = h("button", { type: "button", class: "link", "aria-label": `Remove ${name}` }, "Remove");
     remove.addEventListener("click", () => this.remove(doc.doc_id, remove));
-    return h("li", { class: "doc" },
-      h("span", { class: `type ${type}` }, type === "img" ? "IMG" : ext.toUpperCase()),
-      h("div", { class: "doc-main" }, open,
+    return h("li", {},
+      h("div", { class: "doc-main" }, title,
         h("div", { class: "doc-meta" }, `${FORMAT[doc.format_type]} · ${plural(doc.page_count, "page")}`)),
       remove);
   },
@@ -354,12 +232,11 @@ const Docs = {
     const name = this.nameOf(id);
     try {
       await Server.call(`/documents/${id}`, { method: "DELETE" });
-      Preview.forget(id);
-      this.notice(`Removed ${name}.`);
+      this.status(`Removed ${name}.`);
       await this.load();
     } catch (e) {
       button.disabled = false;
-      this.notice(e.message, "error");
+      this.status(e.message, "error");
     }
   },
 
@@ -367,37 +244,28 @@ const Docs = {
     const form = new FormData();
     form.append("file", file);
     const hint = $("format-hint").value;
-    if (hint && hint !== "auto" && !this.alwaysTyped(file)) form.append("format_hint", hint);
+    if (hint && hint !== "auto" && !TEXT_FILES.includes(extOf(file.name))) form.append("format_hint", hint);
     const btn = $("upload-btn");
     btn.disabled = true; btn.textContent = "Uploading…";
-    this.notice("Reading the file. Scanned and handwritten pages can take a minute.");
+    this.status("Reading the file. Scanned and handwritten pages take longer.");
     try {
       const { body: doc, status } = await Server.call("/upload", { method: "POST", body: form });
       await this.load();
-      if (status === 200) this.notice(`Already uploaded as ${this.nameOf(doc.doc_id)}, so it was not added again.`);
-      else this.notice(`Added ${this.nameOf(doc.doc_id)}. Read as ${FORMAT[doc.format_type].toLowerCase()}, ${plural(doc.page_count, "page")}.`, "ok");
+      if (status === 200) this.status(`Already uploaded as ${this.nameOf(doc.doc_id)}.`);
+      else this.status(`Added ${this.nameOf(doc.doc_id)} (${FORMAT[doc.format_type].toLowerCase()}, ${plural(doc.page_count, "page")}).`, "ok");
       $("upload-form").reset(); this.showChosen();
     } catch (e) {
-      this.notice(e.message, "error");
+      this.status(e.message, "error");
     } finally { btn.disabled = false; btn.textContent = "Upload"; }
   },
 
-  // Word, PowerPoint and .txt files are always typed; images never are (they have no text layer).
-  extOf(file) { return file.name.split(".").pop().toLowerCase(); },
-  alwaysTyped(file) { return ["docx", "pptx", "txt"].includes(this.extOf(file)); },
-
   showChosen() {
-    const f = $("file").files[0], c = $("chosen"), select = $("format-hint");
-    c.textContent = f ? f.name : "No file chosen";
-    c.classList.toggle("set", !!f);
-    const typedOnly = !!f && this.alwaysTyped(f);
-    const image = !!f && !typedOnly && this.extOf(f) !== "pdf";
+    const f = $("file").files[0], select = $("format-hint");
+    $("chosen").textContent = f ? f.name : "or drop a file here";
+    const typedOnly = !!f && TEXT_FILES.includes(extOf(f.name));
     if (typedOnly) select.value = "typed";
-    else if (select.disabled || (select.value === "typed" && image)) select.value = "";   // don't carry over a forced "typed"
-    select.disabled = typedOnly;
-    select.querySelector('option[value="typed"]').disabled = image;
-    $("type-note").textContent = typedOnly ? "Word, PowerPoint and text files are always typed."
-      : "Choosing the type makes uploading faster.";
+    else if (select.disabled) select.value = "";
+    select.disabled = typedOnly;   // Word, PowerPoint and text files are always typed
   },
 
   init() {
@@ -405,14 +273,11 @@ const Docs = {
     $("upload-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const file = $("file").files[0];
-      if (!file) { this.notice("Choose a file first.", "error"); return; }
-      if (!$("format-hint").value && !this.alwaysTyped(file)) {
-        this.notice("Choose the document type: typed, scanned or handwritten.", "error");
-        $("format-hint").focus(); return;
-      }
+      if (!file) { this.status("Choose a file first.", "error"); return; }
+      if (!$("format-hint").value) { this.status("Choose the document type.", "error"); return; }
       this.upload(file);
     });
-    // A file dropped anywhere on the page goes to the upload form (instead of the browser opening it).
+    // A file dropped anywhere on the page goes to the upload form.
     const box = $("upload-form");
     const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
     window.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); box.classList.add("dragging"); } });
@@ -424,83 +289,32 @@ const Docs = {
       if (!e.dataTransfer.files.length) return;
       $("file").files = e.dataTransfer.files;
       this.showChosen();
-      this.notice("File ready. Press Upload.");
-      Tabs.show("docs");
     });
   },
 };
 
-/* ---------- preview window: page images (PDF, images) or text (Word, PowerPoint, .txt) ---------- */
-const Preview = {
-  cache: {}, docId: null, page: 1, info: null,
-
-  async open(docId, page = 1) {
-    if (!this.cache[docId]) this.cache[docId] = await Server.get(`/documents/${docId}/preview`);
-    this.docId = docId; this.info = this.cache[docId];
-    this.page = Math.min(Math.max(1, page), this.info.page_count || 1);
-    this.render();
-    if (!$("preview").open) $("preview").showModal();
-  },
-
-  render() {
-    const { info, page, docId } = this;
-    $("preview-title").textContent = Docs.nameOf(docId);
-    $("page-where").textContent = `Page ${page} of ${info.page_count}`;
-    $("page-prev").disabled = page <= 1;
-    $("page-next").disabled = page >= info.page_count;
-    const body = $("preview-body"), full = $("page-full");
-    if (info.kind === "text") {
-      body.replaceChildren(h("pre", {}, info.text_pages[page - 1] || "(This page has no text.)"));
-      full.hidden = true;
-    } else {
-      const src = Server.url(`/documents/${docId}/pages/${page}`);
-      body.replaceChildren(h("img", { src, alt: `${Docs.nameOf(docId)}, page ${page}` }));
-      full.href = src; full.hidden = false;
-    }
-    body.scrollTop = 0;
-  },
-
-  forget(docId) { delete this.cache[docId]; if (this.docId === docId && $("preview").open) $("preview").close(); },
-
-  init() {
-    $("page-prev").addEventListener("click", () => { this.page--; this.render(); });
-    $("page-next").addEventListener("click", () => { this.page++; this.render(); });
-    $("preview-close").addEventListener("click", () => $("preview").close());
-    $("preview").addEventListener("click", (e) => { if (e.target === $("preview")) $("preview").close(); });  // click outside
-  },
-};
-
-/* ---------- chat: the current conversation only (nothing is saved) ----------
-   The last few turns go with each question so follow-ups like "explain that" work. */
+/* ---------- chat (nothing is saved; the last turns go along for follow-up questions) ---------- */
 const WHY = {
-  Certain: "Strong match in clearly readable text.",
-  Moderate: "Relevant text found, but the match was looser or the text only partly legible.",
-  Uncertain: "No strong supporting passage; check the source before relying on this.",
-  Unreadable: "The relevant passage could not be read reliably (poor scan or handwriting).",
+  Certain: "strong match in clearly readable text.",
+  Moderate: "relevant text found, but the match was looser or the text only partly legible.",
+  Uncertain: "no strong supporting passage; check the source.",
+  Unreadable: "the source could not be read reliably.",
 };
 
 const Chat = {
-  turns: [],   // {question, answer}
-
-  reset() {
-    this.turns = [];
-    $("thread").replaceChildren(this.intro());
-    $("question").focus();
-  },
+  turns: [],
 
   intro() {
-    return h("div", { class: "intro" },
-      h("h2", {}, Docs.hasAny() ? "Ask a question about your documents" : "Upload a document to begin"),
-      h("p", {}, "Every answer is labelled with how far you can trust it."),
-      h("div", { class: "tiers" },
-        ...["Certain", "Moderate", "Uncertain", "Unreadable"].map((t) => h("span", { class: `badge ${t}`, title: WHY[t] }, t))));
+    const box = $("messages");
+    if (box.querySelector(".entry")) return;
+    box.replaceChildren(h("p", { class: "intro" },
+      Docs.hasAny() ? "Ask a question about your documents." : "Upload a document, then ask a question about it."));
   },
-  refreshIntro() { const i = $("thread").querySelector(".intro"); if (i) i.replaceWith(this.intro()); },
 
-  // Answers may use light Markdown (**bold**, lists). Escape first; never inject raw HTML.
-  renderAnswer(text) {
+  // Light Markdown (**bold**, lists) from the model. Escape first; never inject raw HTML.
+  render(text) {
     const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|\W)\*(\S.*?)\*(?=\W|$)/g, "$1<em>$2</em>");
+    const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     let html = "", list = null;
     for (const raw of text.split("\n")) {
       const line = raw.trim();
@@ -516,66 +330,52 @@ const Chat = {
     return div;
   },
 
-  source(s, n) {
-    const li = h("li", {}, h("span", { class: "ref" }, `[${n}]`), h("span", { class: "src-name" }, Docs.nameOf(s.doc_id)));
-    if (s.page) {
-      let text = `p. ${s.page}`;
-      if (s.first_line) text += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
-      const link = h("button", { type: "button", class: "textlink", title: "Open this page" }, text);
-      link.addEventListener("click", () => Preview.open(s.doc_id, s.page).catch((e) => this.fail(e.message)));
-      li.append(", ", link);
-    }
+  source(s) {
+    let where = s.page ? `p. ${s.page}` : "";
+    if (s.page && s.first_line) where += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
+    const place = where && Docs.hasPages(s.doc_id)
+      ? h("a", { href: Docs.pageUrl(s.doc_id, s.page), target: "_blank", rel: "noopener" }, where)
+      : where;
     const pct = (v) => `${Math.round(v * 100)}%`;
-    li.append(h("span", { class: "scores" }, " — match ", h("em", {}, pct(s.similarity)), ", readability ", h("em", {}, pct(s.confidence))),
-      h("details", {}, h("summary", { class: "textlink" }, "Show passage"), h("blockquote", {}, s.text)));
-    return li;
+    return h("li", { title: s.text }, `${Docs.nameOf(s.doc_id)}${where ? ", " : ""}`, place,
+      " — match ", h("em", {}, pct(s.similarity)), ", readability ", h("em", {}, pct(s.confidence)));
   },
-
-  entry(question, text, state) {
-    const bubble = h("div", { class: "bubble" }, h("div", { class: "a" }, text));
-    return h("div", { class: `entry ${state}` }, question ? h("p", { class: "q" }, question) : "", bubble);
-  },
-
-  fill(entry, answer, sources) {
-    const label = answer.reliability_label;
-    entry.className = "entry";
-    const bubble = entry.querySelector(".bubble");
-    bubble.querySelector(".a").replaceWith(this.renderAnswer(answer.answer_text));
-    bubble.append(h("div", { class: `verdict ${label}` }, h("span", { class: "badge" }, label), WHY[label]));
-    if (sources.length) {
-      const list = h("ol", {});
-      sources.forEach((s, i) => list.append(this.source(s, i + 1)));
-      bubble.append(h("details", { class: "sources" }, h("summary", {}, `Sources (${sources.length})`), list));
-    }
-  },
-
-  fail(message) { $("thread").append(this.entry("", message, "failed")); this.scroll(); },
-  scroll() { const m = $("messages"); m.scrollTop = m.scrollHeight; },
 
   async ask(text) {
-    const thread = $("thread");
-    thread.querySelector(".intro")?.remove();
-    const entry = this.entry(text, "Looking through your documents…", "pending");
-    thread.append(entry);
-    this.scroll();
+    const box = $("messages");
+    box.querySelector(".intro")?.remove();
+    const answer = h("div", { class: "answer" }, h("div", { class: "a" }, "Looking through your documents…"));
+    const entry = h("div", { class: "entry pending" }, h("p", { class: "q" }, text), answer);
+    box.append(entry);
+    box.scrollTop = box.scrollHeight;
     try {
-      const reply = await Server.post("/chat", { question_text: text, history: this.turns.slice(-3) });
+      const reply = (await Server.call("/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question_text: text, history: this.turns.slice(-3) }),
+      })).body;
       this.turns.push({ question: text, answer: reply.answer.answer_text });
-      this.fill(entry, reply.answer, reply.sources);
+      const label = reply.answer.reliability_label;
+      entry.className = "entry";
+      answer.replaceChildren(this.render(reply.answer.answer_text),
+        h("p", { class: `label ${label}` }, h("b", {}, label), ` – ${WHY[label]}`));
+      if (reply.sources.length) {
+        answer.append(h("details", { class: "sources" }, h("summary", {}, `Sources (${reply.sources.length})`),
+          h("ol", {}, ...reply.sources.map((s) => this.source(s)))));
+      }
       return true;
     } catch (e) {
       entry.className = "entry failed";
-      entry.querySelector(".a").textContent = e.message;
+      answer.querySelector(".a").textContent = e.message;
       return false;
-    } finally { this.scroll(); }
+    } finally { box.scrollTop = box.scrollHeight; }
   },
 
   init() {
     const q = $("question"), btn = $("ask-btn");
     const fit = () => {
       q.style.height = "auto";
-      q.style.height = `${Math.min(Math.max(q.scrollHeight, 42), 160)}px`;
-      q.style.overflowY = q.scrollHeight > 160 ? "auto" : "hidden";   // scrollbar only when really needed
+      q.style.height = `${Math.min(Math.max(q.scrollHeight, 40), 160)}px`;
+      q.style.overflowY = q.scrollHeight > 160 ? "auto" : "hidden";
     };
     q.addEventListener("input", fit);
     q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask-form").requestSubmit(); } });
@@ -585,30 +385,15 @@ const Chat = {
       if (!text || btn.disabled) return;
       btn.disabled = true;
       q.value = ""; fit();
-      const ok = await this.ask(text);
-      if (!ok && !q.value) { q.value = text; fit(); }   // keep the question so it can be re-sent
+      if (!(await this.ask(text)) && !q.value) { q.value = text; fit(); }   // keep a failed question
       btn.disabled = false; q.focus();
     });
   },
 };
 
-/* ---------- phones: Chat | Files ---------- */
-const Tabs = {
-  show(tab) {
-    document.body.dataset.tab = tab;
-    $("tab-chat").setAttribute("aria-selected", tab === "chat");
-    $("tab-docs").setAttribute("aria-selected", tab === "docs");
-  },
-  init() {
-    $("tab-chat").addEventListener("click", () => this.show("chat"));
-    $("tab-docs").addEventListener("click", () => this.show("docs"));
-  },
-};
-
-/* ---------- start ---------- */
-Docs.init(); Preview.init(); Chat.init(); Tabs.init();
-Chat.reset();
-Docs.load().catch((e) => { Docs.notice(e.message, "error"); Chat.fail(e.message); });
+Docs.init(); Chat.init();
+Chat.intro();
+Docs.load().catch((e) => Docs.status(e.message, "error"));
 </script>
 </body>
 </html>
