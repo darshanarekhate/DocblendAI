@@ -6,7 +6,7 @@
 <title>DocBlendAI</title>
 <style>
   :root {
-    color-scheme: light dark;  /* native scrollbars and dropdowns follow the theme */
+    color-scheme: light;
     --bg: #f7f5f0; --panel: #ffffff; --text: #1f1e1b; --muted: #6b675f; --faint: #8d887e; --line: #e4dfd5;
     --accent: #2f5d50; --accent-hover: #244a40; --accent-text: #ffffff; --accent-soft: #e8efec;
     --field: #fbfaf7; --quote: #f4f1ea;
@@ -15,20 +15,8 @@
     --uncertain: #5f5b53; --uncertain-bg: #efece6;
     --unreadable: #b3261e; --unreadable-bg: #fae7e4;
     --error: #b3261e;
-    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1a1917; --panel: #23221f; --text: #ece9e2; --muted: #a8a397; --faint: #8a857a; --line: #37342f;
-      --accent: #86b8a8; --accent-hover: #9ccabb; --accent-text: #112019; --accent-soft: #28332f;
-      --field: #1e1d1a; --quote: #2a2925;
-      --certain: #7fcf9c; --certain-bg: #1f3027;
-      --moderate: #e7b565; --moderate-bg: #372b17;
-      --uncertain: #b9b4a9; --uncertain-bg: #2e2c28;
-      --unreadable: #f0907f; --unreadable-bg: #3a211d;
-      --error: #f0907f;
-    }
+    --serif: "Times New Roman", Times, "Liberation Serif", serif;
+    --sans: var(--serif);   /* one font everywhere: Times New Roman */
   }
 
   * { box-sizing: border-box; }
@@ -266,7 +254,6 @@ function setStatus(id, text, kind = "") {
 }
 
 async function deleteDoc(d, button) {
-  if (!confirm(`Remove "${docLabel(d.doc_id)}"? It is removed from DocBlendAI only; your original file is not touched.`)) return;
   button.disabled = true;
   try {
     await api(`/documents/${d.doc_id}`, { method: "DELETE" });
