@@ -143,7 +143,8 @@ def _ingest(doc_id: str, path: Path, format_hint: FormatType | None, db: Session
     unreadable = f"File is not a readable {path.suffix} file (damaged, or not what its extension says)"
     try:
         pages = format_detection.page_count(str(path))
-        format_type = format_detection.resolve_format(str(path), format_hint)
+        # Detection reads a few sample pages; they are reused below instead of read twice.
+        format_type, already_read = format_detection.resolve(str(path), format_hint)
     except (PdfminerException, file_types.UnreadableFileError):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, unreadable)
     except (ocr_extractor.OCRUnavailableError, htr_extractor.HTRUnavailableError) as e:
@@ -151,7 +152,7 @@ def _ingest(doc_id: str, path: Path, format_hint: FormatType | None, db: Session
 
     document = Document(doc_id=doc_id, file_path=str(path), format_type=format_type, page_count=pages)
     try:
-        extracted = format_detection.extract(document)
+        extracted = format_detection.extract(document, already_read)
     except file_types.UnreadableFileError:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, unreadable)
     except (ocr_extractor.OCRUnavailableError, htr_extractor.HTRUnavailableError) as e:

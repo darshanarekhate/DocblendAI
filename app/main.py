@@ -7,6 +7,7 @@ Run with:  venv/Scripts/python -m uvicorn app.main:app --reload
 """
 
 import logging
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -24,6 +25,32 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 # Uvicorn only configures its own loggers; this makes app.* INFO logs visible too.
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+
+def _warm_up_models() -> None:
+    """Load (and run once) the models a scanned or handwritten upload needs.
+
+    Loading TrOCR and docTR takes ~15 s and their first run is slower than later
+    ones; doing both at startup, off the request path, keeps that out of uploads.
+    A model that cannot load is simply loaded (and reported) on first use instead.
+    """
+    from PIL import Image
+
+    from app.modules import htr_extractor, line_segmentation, ocr_extractor
+
+    blank_line, blank_page = Image.new("L", (384, 64), 255), Image.new("L", (850, 1100), 255)
+    steps = [("HTR model", lambda: htr_extractor.recognize_lines([blank_line]))]
+    if settings.htr_segmenter == "doctr":
+        steps.append(("line detector", lambda: line_segmentation.detect_lines(blank_page)))
+    if ocr_extractor._engine() == "doctr":
+        steps.append(("docTR OCR", lambda: ocr_extractor.ocr_image(blank_page)))
+    for name, step in steps:
+        try:
+            step()
+        except Exception as e:  # noqa: BLE001 - a warm-up failure must never stop the server
+            logger.warning("Could not preload %s: %s", name, e)
+    logger.info("OCR/HTR models loaded")
 
 
 @asynccontextmanager
@@ -31,6 +58,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     settings.chroma_dir.mkdir(parents=True, exist_ok=True)
     init_db()
+    if settings.preload_models:
+        threading.Thread(target=_warm_up_models, name="model-warm-up", daemon=True).start()
     yield
 
 

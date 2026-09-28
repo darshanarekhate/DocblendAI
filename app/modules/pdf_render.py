@@ -34,16 +34,20 @@ def denoise(image: Image.Image) -> Image.Image:
     return image.filter(ImageFilter.MedianFilter(3))
 
 
-def render_pages(file_path: str, dpi: int, max_pages: int | None = None) -> Iterator[Image.Image]:
-    """Yield each page (PDF page or image frame) as a grayscale PIL image at about the given DPI."""
+def render_pages(file_path: str, dpi: int, max_pages: int | None = None, first_page: int = 0) -> Iterator[Image.Image]:
+    """Yield each page (PDF page or image frame) as a grayscale PIL image at about the given DPI.
+
+    max_pages limits to the document's first max_pages pages; first_page (0-based) skips
+    the pages before it, e.g. ones already read while detecting the format.
+    """
     if kind_of(file_path) is FileKind.IMAGE:
-        yield from _image_pages(file_path, dpi, max_pages)
+        yield from _image_pages(file_path, dpi, max_pages, first_page)
         return
 
     pdf = pdfium.PdfDocument(file_path)
     try:
         count = len(pdf) if max_pages is None else min(len(pdf), max_pages)
-        for i in range(count):
+        for i in range(first_page, count):
             page = pdf[i]
             try:
                 yield page.render(scale=dpi / PDF_POINTS_PER_INCH).to_pil().convert("L")
@@ -79,12 +83,14 @@ def _to_page(frame: Image.Image, dpi: int) -> Image.Image:
     return page
 
 
-def _image_pages(file_path: str, dpi: int, max_pages: int | None) -> Iterator[Image.Image]:
+def _image_pages(file_path: str, dpi: int, max_pages: int | None, first_page: int = 0) -> Iterator[Image.Image]:
     img = _open_image(file_path)
     try:
         for i, frame in enumerate(ImageSequence.Iterator(img)):
             if max_pages is not None and i >= max_pages:
                 break
+            if i < first_page:
+                continue
             try:
                 yield _to_page(frame, dpi)
             except OSError as e:  # truncated / corrupt pixel data surfaces only on decode

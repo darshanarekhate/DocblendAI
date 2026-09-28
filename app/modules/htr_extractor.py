@@ -190,9 +190,10 @@ def teacher_forced_logits(lines: list[Image.Image], texts: list[str]) -> list[tu
     return out
 
 
-def htr_file(file_path: str, max_pages: int | None = None) -> list[tuple[str, float]]:
-    """Return (page_text, raw_conf) for each page of a PDF or image (or the first max_pages)."""
+def htr_file(file_path: str, max_pages: int | None = None, first_page: int = 0) -> list[tuple[str, float]]:
+    """Return (page_text, raw_conf) for each page of a PDF or image (or the first max_pages),
+    starting at page index first_page."""
     # closing(): release the PDF immediately if HTR fails (see ocr_extractor.ocr_file).
-    with closing(render_pages(file_path, HTR_DPI, max_pages)) as pages:
+    with closing(render_pages(file_path, HTR_DPI, max_pages, first_page)) as pages:
         # Orientation uses Tesseract OSD; it degrades to a no-op if Tesseract is missing.
         return [htr_image(ocr_extractor.auto_orient(img)) for img in pages]

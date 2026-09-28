@@ -179,9 +179,10 @@ def auto_orient(page: Image.Image) -> Image.Image:
     return best
 
 
-def ocr_file(file_path: str, max_pages: int | None = None) -> list[tuple[str, float]]:
-    """Return (page_text, raw_conf) for each page of a PDF or image (or the first max_pages)."""
+def ocr_file(file_path: str, max_pages: int | None = None, first_page: int = 0) -> list[tuple[str, float]]:
+    """Return (page_text, raw_conf) for each page of a PDF or image (or the first max_pages),
+    starting at page index first_page."""
     # closing(): if OCR fails mid-document, release the PDF now, not at garbage
     # collection (Windows cannot delete a file that is still open).
-    with closing(render_pages(file_path, settings.ocr_dpi, max_pages)) as pages:
+    with closing(render_pages(file_path, settings.ocr_dpi, max_pages, first_page)) as pages:
         return [ocr_image(auto_orient(img)) for img in pages]
