@@ -182,7 +182,6 @@
     <button type="button" role="tab" id="tab-chat" aria-selected="true">Chat</button>
     <button type="button" role="tab" id="tab-docs" aria-selected="false">Files</button>
   </nav>
-  <button type="button" class="btn plain" id="new-chat">New chat</button>
 </header>
 
 <div class="layout">
@@ -549,7 +548,6 @@ const Chat = {
       if (!ok && !q.value) { q.value = text; fit(); }   // keep the question so it can be re-sent
       btn.disabled = false; q.focus();
     });
-    $("new-chat").addEventListener("click", () => { this.reset(); Tabs.show("chat"); });
   },
 };
 
