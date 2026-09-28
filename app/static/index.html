@@ -8,168 +8,187 @@
 <style>
   :root {
     color-scheme: light;
-    --bg: #eef1f4;          /* page */
-    --panel: #ffffff;
-    --head: #f6f8fa;        /* panel headings, table header, question rows */
-    --line: #d5dbe2;
-    --line-2: #bcc5cf;
-    --ink: #222b35;
-    --ink-2: #56606b;
-    --ink-3: #87909a;
-    --navy: #2c4a6b;        /* top bar */
-    --blue: #3b6ea0;        /* buttons, links */
-    --blue-dark: #2f5a84;
-    --blue-soft: #e7eef6;
-    --green: #2e7d4f;       /* confidence scores, "Certain" */
-    --green-soft: #e6f2ea;
-    --amber: #9a6700;
-    --slate: #5a6572;
-    --red: #b03a2e;
-    --red-soft: #fbeae7;
+    --bg: #f3f6fa;          /* page background: light cool grey */
+    --panel: #ffffff;       /* panels */
+    --soft: #f7f9fc;        /* inputs, drop zone, sources */
+    --line: #e1e7ef;        /* borders */
+    --line-2: #cdd6e2;
+    --ink: #1f2a37;         /* text */
+    --ink-2: #5b6778;       /* secondary text */
+    --ink-3: #8a95a5;       /* hints */
+    --blue: #3a6ea5;        /* buttons, links */
+    --blue-dark: #2d5985;
+    --blue-soft: #e8f0f9;   /* question bubble, drag highlight */
+    --green: #2f7d5b;       /* confidence scores, "Certain" */
+    --green-soft: #e4f3ec;
+    --amber: #95650c;
+    --amber-soft: #faf0dc;
+    --slate: #556173;
+    --slate-soft: #eceff4;
+    --red: #b23b2a;
+    --red-soft: #fbe9e6;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", sans-serif;
   }
 
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 14.5px/1.5 "Segoe UI", Tahoma, Arial, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
   h1, h2, h3, p { margin: 0; }
   button, input, select, textarea { font: inherit; color: inherit; }
   a { color: var(--blue); }
-  :focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   [hidden] { display: none !important; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  .btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 14px; border: 1px solid var(--blue-dark);
-         border-radius: 3px; background: var(--blue); color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; }
-  .btn:hover:not(:disabled) { background: var(--blue-dark); }
+  /* ---- buttons ---- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 16px; border: 1px solid var(--blue);
+         border-radius: 6px; background: var(--blue); color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .btn:hover:not(:disabled) { background: var(--blue-dark); border-color: var(--blue-dark); }
   .btn:disabled { opacity: .55; cursor: not-allowed; }
-  .btn.plain { background: #f4f6f8; color: var(--ink); border-color: var(--line-2); }
-  .btn.plain:hover:not(:disabled) { background: #e9edf1; }
-  .textlink { border: 0; background: none; padding: 0; color: var(--blue); cursor: pointer; font-size: inherit; text-decoration: underline; }
-  .textlink.quiet { color: var(--ink-2); }
+  .btn.plain { background: var(--panel); color: var(--ink); border-color: var(--line-2); font-weight: 500; }
+  .btn.plain:hover:not(:disabled) { background: var(--soft); border-color: var(--ink-3); }
+  .textlink { border: 0; background: none; padding: 0; color: var(--blue); cursor: pointer; font-size: inherit; }
+  .textlink:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .textlink.quiet { color: var(--ink-3); }
   .textlink.quiet:hover { color: var(--red); }
-  select { height: 32px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: 3px; background: #fff; font-size: 14px; }
+  select { height: 36px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel); font-size: 14px; }
 
-  /* ---- top bar ---- */
-  .top { height: 50px; display: flex; align-items: center; gap: 16px; padding: 0 20px; background: var(--navy); color: #fff; }
-  .top h1 { font-size: 19px; font-weight: 600; }
-  .top .note { font-size: 13px; color: #c9d5e2; }
+  /* ---- frame ---- */
+  .top { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 28px; height: 28px; border-radius: 6px; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+  .wordmark { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .top .note { font-size: 13.5px; color: var(--ink-3); padding-left: 14px; border-left: 1px solid var(--line); }
   .top .grow { flex: 1; }
   .tabs { display: none; }
-
-  .layout { height: calc(100% - 50px); display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 14px; padding: 14px; }
-  .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
-  .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 14px; background: var(--head); border-bottom: 1px solid var(--line); }
+  .layout { height: calc(100% - 56px); display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; padding: 16px; }
+  .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   .panel-head h2 { font-size: 15px; font-weight: 600; }
   .panel-head .sub { font-size: 12.5px; color: var(--ink-3); }
 
-  /* ---- documents ---- */
-  .docs { overflow-y: auto; }   /* short screens: the upload controls must stay reachable */
-  .upload { padding: 12px 14px 14px; border-bottom: 1px solid var(--line); }
-  .upload.dragging { background: var(--blue-soft); outline: 2px dashed var(--blue); outline-offset: -4px; }
-  .field { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 8px; }
-  .field .label { font-size: 13.5px; color: var(--ink-2); }
-  .filebox { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .chosen { min-width: 0; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chosen.set { color: var(--ink); }
-  .upload .submit { display: flex; align-items: center; gap: 10px; margin: 10px 0 0 48px; }
-  .upload .auto { font-size: 12.5px; color: var(--ink-3); line-height: 1.3; }
-  .upload .hint { margin: 8px 0 0 48px; font-size: 12.5px; color: var(--ink-3); }
-  .notice { margin: 10px 14px 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 3px; font-size: 13.5px; color: var(--ink-2); background: var(--head); }
+  /* ---- documents panel ---- */
+  .upload { margin: 16px 18px 0; }
+  .drop { display: block; padding: 18px 14px; border: 1.5px dashed var(--line-2); border-radius: 8px; background: var(--soft); text-align: center;
+          transition: border-color .12s, background-color .12s; }
+  .upload.dragging .drop { border-color: var(--blue); background: var(--blue-soft); }
+  .drop .big { font-weight: 600; font-size: 14.5px; }
+  .drop .small { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+  .drop .pick { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .chosen { max-width: 100%; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chosen.set { color: var(--ink); font-weight: 600; }
+  .upload .row { display: flex; gap: 8px; margin-top: 10px; }
+  .upload .row select { flex: 1; min-width: 0; }
+  .upload .auto { margin-top: 8px; font-size: 12.5px; color: var(--ink-3); text-align: center; }
+  .notice { margin: 10px 18px 0; padding: 8px 10px; border-radius: 6px; font-size: 13.5px; color: var(--ink-2); background: var(--soft); }
   .notice:empty { display: none; }
-  .notice.ok { color: var(--green); background: var(--green-soft); border-color: #c7dfcf; }
-  .notice.error { color: var(--red); background: var(--red-soft); border-color: #eccac4; }
+  .notice.ok { color: var(--green); background: var(--green-soft); }
+  .notice.error { color: var(--red); background: var(--red-soft); }
 
-  table.files { width: calc(100% - 28px); margin: 12px 14px 16px; border-collapse: collapse; font-size: 13.5px; table-layout: fixed; }
-  .files th { text-align: left; font-weight: 600; color: var(--ink-2); background: var(--head); border: 1px solid var(--line); padding: 5px 8px; }
-  .files td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
-  .files th:nth-child(2), .files td:nth-child(2) { width: 96px; }
-  .files th:nth-child(3), .files td:nth-child(3) { width: 50px; text-align: right; }
-  .files th:nth-child(4), .files td:nth-child(4) { width: 66px; text-align: center; }
-  .files tbody tr:nth-child(even) td { background: #fafbfc; }
-  .doc-name { display: block; max-width: 100%; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; color: var(--blue);
-              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .doc-name:hover { text-decoration: underline; }
-  .files td.empty { color: var(--ink-3); text-align: left !important; }
+  .list-title { margin: 18px 18px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .docs { overflow-y: auto; }   /* short screens: the upload controls must stay reachable */
+  .doc-list { list-style: none; margin: 0; padding: 0 10px 14px; }
+  .doc { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 6px; }
+  .doc:hover { background: var(--soft); }
+  .type { flex: none; width: 42px; padding: 3px 0; border-radius: 4px; font-size: 10.5px; font-weight: 700; text-align: center; letter-spacing: .03em;
+          color: var(--slate); background: var(--slate-soft); }
+  .type.pdf { color: var(--red); background: var(--red-soft); }
+  .type.docx, .type.pptx { color: var(--blue); background: var(--blue-soft); }
+  .type.img { color: var(--green); background: var(--green-soft); }
+  .doc-main { flex: 1; min-width: 0; }
+  .doc-name { display: block; max-width: 100%; border: 0; background: none; padding: 0; text-align: left; cursor: pointer;
+              font-size: 14px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-name:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+  .doc-meta { font-size: 12.5px; color: var(--ink-3); }
+  .doc .textlink { font-size: 12.5px; flex: none; }
+  .empty { padding: 10px 8px; font-size: 14px; color: var(--ink-3); }
 
-  /* ---- questions & answers ---- */
-  .messages { flex: 1; overflow-y: auto; }
-  .thread { max-width: 800px; padding: 16px 18px 8px; }
-  .intro { color: var(--ink-2); }
-  .intro p + p { margin-top: 6px; }
-  .intro b { color: var(--ink); }
+  /* ---- chat panel ---- */
+  .messages { flex: 1; overflow-y: auto; background: var(--panel); }
+  .thread { max-width: 760px; margin: 0 auto; padding: 24px 24px 12px; }
+  .intro { max-width: 520px; margin: 40px auto 0; text-align: center; color: var(--ink-2); }
+  .intro h2 { font-size: 20px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .tiers { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+  .tier { font-size: 13px; color: var(--ink-2); }
 
-  .entry { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 3px; }
-  .q { padding: 8px 12px; background: var(--head); border-bottom: 1px solid var(--line); font-weight: 600; white-space: pre-wrap; }
-  .q::before { content: "Q: "; color: var(--ink-3); }
-  .bubble { padding: 10px 12px; }
-  .a { line-height: 1.6; }
-  .a p { margin-bottom: 8px; }
+  .entry { margin-bottom: 22px; }
+  .q { width: fit-content; max-width: 80%; margin-left: auto; padding: 9px 14px; border-radius: 10px 10px 2px 10px; background: var(--blue-soft);
+       color: var(--ink); white-space: pre-wrap; }
+  .bubble { margin-top: 10px; max-width: 92%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px 10px 10px 2px; background: var(--panel); }
+  .a { font-size: 15px; line-height: 1.65; }
+  .a p { margin-bottom: 10px; }
   .a p:last-child { margin-bottom: 0; }
-  .a ul, .a ol { margin: 0 0 8px; padding-left: 22px; }
-  .entry.pending .a { color: var(--ink-3); font-style: italic; }
-  .entry.failed { border-color: #eccac4; }
+  .a ul, .a ol { margin: 0 0 10px; padding-left: 22px; }
+  .a li { margin-bottom: 3px; }
+  .entry.pending .a { color: var(--ink-3); }
+  .entry.failed .bubble { border-color: #f0c9c1; background: var(--red-soft); }
   .entry.failed .a { color: var(--red); }
 
-  .verdict { margin-top: 10px; font-size: 13.5px; color: var(--ink-2); }
-  .verdict b { font-weight: 600; color: var(--tone); }
-  .Certain { --tone: var(--green); }
-  .Moderate { --tone: var(--amber); }
-  .Uncertain { --tone: var(--slate); }
-  .Unreadable { --tone: var(--red); }
+  .verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line);
+             font-size: 13px; color: var(--ink-2); }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--tone); background: var(--tone-soft); }
+  .Certain { --tone: var(--green); --tone-soft: var(--green-soft); }
+  .Moderate { --tone: var(--amber); --tone-soft: var(--amber-soft); }
+  .Uncertain { --tone: var(--slate); --tone-soft: var(--slate-soft); }
+  .Unreadable { --tone: var(--red); --tone-soft: var(--red-soft); }
 
-  .sources { margin-top: 6px; font-size: 13.5px; }
-  .sources > summary { cursor: pointer; color: var(--blue); width: max-content; }
-  .sources ol { margin: 6px 0 0; padding-left: 0; list-style: none; }
-  .sources li { padding: 5px 0; border-top: 1px solid #eceff2; }
-  .ref { color: var(--ink-3); margin-right: 4px; }
+  .sources { margin-top: 8px; font-size: 13px; }
+  .sources > summary { cursor: pointer; color: var(--blue); width: max-content; font-weight: 500; }
+  .sources ol { margin: 8px 0 0; padding: 0; list-style: none; }
+  .sources li { padding: 8px 10px; margin-top: 6px; border-radius: 6px; background: var(--soft); }
+  .ref { color: var(--ink-3); font-variant-numeric: tabular-nums; margin-right: 6px; }
   .src-name { font-weight: 600; }
   .scores { color: var(--ink-3); }
   .scores em { font-style: normal; color: var(--green); font-weight: 600; }
-  .sources blockquote { margin: 5px 0 2px; padding: 6px 10px; border-left: 3px solid var(--line); background: var(--head); color: var(--ink-2);
+  .sources details summary { margin-top: 2px; }
+  .sources blockquote { margin: 6px 0 2px; padding: 6px 10px; border-left: 2px solid var(--line-2); background: var(--panel); color: var(--ink-2);
                         white-space: pre-wrap; max-height: 170px; overflow: auto; font-size: 13px; }
 
-  .composer { border-top: 1px solid var(--line); background: var(--head); padding: 10px 14px 8px; }
-  .composer form { max-width: 800px; display: flex; gap: 8px; align-items: flex-end; }
-  .composer textarea { flex: 1; min-height: 38px; max-height: 160px; padding: 8px 10px; resize: none; line-height: 1.4;
-                       border: 1px solid var(--line-2); border-radius: 3px; background: #fff; overflow-y: hidden; }
-  .composer textarea:focus { outline: none; border-color: var(--blue); }
-  .composer .btn { height: 38px; padding: 0 18px; }
-  .composer .hint { margin-top: 4px; font-size: 12px; color: var(--ink-3); }
+  .composer { border-top: 1px solid var(--line); background: var(--soft); }
+  .composer form { max-width: 760px; margin: 0 auto; padding: 12px 24px 4px; display: flex; gap: 10px; align-items: flex-end; }
+  .composer textarea { flex: 1; min-height: 42px; max-height: 160px; padding: 10px 12px; resize: none; line-height: 1.45;
+                       border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); font-size: 15px; overflow-y: hidden; }
+  .composer textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
+  .composer .btn { height: 42px; padding: 0 20px; }
+  .composer .hint { max-width: 760px; margin: 0 auto; padding: 0 24px 10px; font-size: 12px; color: var(--ink-3); }
 
   /* ---- preview window ---- */
-  dialog.preview { width: min(780px, calc(100% - 32px)); padding: 0; border: 1px solid var(--line-2); border-radius: 3px; background: var(--panel); color: var(--ink); }
-  dialog.preview::backdrop { background: rgba(34, 43, 53, .45); }
+  dialog.preview { width: min(780px, calc(100% - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+  dialog.preview::backdrop { background: rgba(31, 42, 55, .35); }
   .pv { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
-  .pv-head, .pv-foot { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: var(--head); }
+  .pv-head, .pv-foot { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
   .pv-head { border-bottom: 1px solid var(--line); }
   .pv-head h2 { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pv-body { overflow: auto; background: var(--bg); padding: 12px; }
+  .pv-body { overflow: auto; background: var(--bg); padding: 14px; }
   .pv-body img { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #fff; }
-  .pv-body pre { margin: 0; padding: 16px 18px; border: 1px solid var(--line); background: #fff; font: 14.5px/1.6 "Segoe UI", Tahoma, Arial, sans-serif; white-space: pre-wrap; }
+  .pv-body pre { margin: 0; padding: 18px 20px; border: 1px solid var(--line); background: #fff; font: 15px/1.7 var(--sans); white-space: pre-wrap; }
   .pv-foot { border-top: 1px solid var(--line); justify-content: space-between; font-size: 13.5px; color: var(--ink-2); }
-  .pv-foot .btn { height: 30px; }
+  .pv-foot .btn { height: 32px; }
 
   /* ---- phones: Chat | Files ---- */
   @media (max-width: 860px) {
     .top { padding: 0 12px; gap: 10px; }
-    .top .note, .top .grow { display: none; }
-    .tabs { display: flex; margin-left: auto; border: 1px solid #5d7896; border-radius: 3px; overflow: hidden; }
-    .tabs button { height: 30px; padding: 0 12px; border: 0; background: transparent; color: #dfe7ef; font-size: 14px; cursor: pointer; white-space: nowrap; }
-    .tabs button + button { border-left: 1px solid #5d7896; }
-    .tabs button[aria-selected="true"] { background: #fff; color: var(--navy); }
-    .layout { grid-template-columns: minmax(0, 1fr); padding: 8px; gap: 8px; }
+    .top .note { display: none; }
+    .tabs { display: flex; margin-left: auto; border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden; }
+    .tabs button { height: 32px; padding: 0 12px; border: 0; background: var(--panel); font-size: 14px; cursor: pointer; white-space: nowrap; }
+    .tabs button + button { border-left: 1px solid var(--line-2); }
+    .tabs button[aria-selected="true"] { background: var(--blue); color: #fff; }
+    .top .grow { display: none; }
+    .layout { grid-template-columns: minmax(0, 1fr); padding: 10px; gap: 10px; }
     body[data-tab="chat"] .docs, body[data-tab="docs"] .chat { display: none; }
-    .panel-head .sub { display: none; }
-    .thread { padding: 12px; }
-    .composer { padding: 8px 10px 6px; }
+    .thread { padding: 16px 14px 8px; }
+    .q { max-width: 90%; }
+    .bubble { max-width: 100%; }
+    .composer form { padding: 10px 12px 4px; }
+    .composer .hint { padding: 0 12px 8px; }
   }
 </style>
 </head>
 <body data-tab="chat">
 
 <header class="top">
-  <h1>DocBlendAI</h1>
-  <span class="note">Question answering over typed, scanned and handwritten documents</span>
+  <div class="brand"><span class="mark" aria-hidden="true">D</span><span class="wordmark">DocBlendAI</span></div>
+  <span class="note">Ask questions about your typed, scanned and handwritten documents</span>
   <span class="grow"></span>
   <nav class="tabs" role="tablist" aria-label="View">
     <button type="button" role="tab" id="tab-chat" aria-selected="true">Chat</button>
@@ -182,48 +201,44 @@
   <aside class="panel docs" aria-labelledby="docs-title">
     <div class="panel-head"><h2 id="docs-title">Documents</h2><span class="sub" id="doc-count"></span></div>
     <form class="upload" id="upload-form">
-      <div class="field">
-        <span class="label">File</span>
-        <div class="filebox">
-          <label class="btn plain" for="file">Browse…</label>
+      <div class="drop">
+        <p class="big">Drop a file here</p>
+        <p class="small">PDF, Word, PowerPoint, text or an image</p>
+        <div class="pick">
+          <label class="btn plain" for="file">Choose file…</label>
           <span class="chosen" id="chosen">No file chosen</span>
         </div>
       </div>
       <input type="file" id="file" class="sr-only" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
-      <div class="field">
-        <label class="label" for="format-hint">Type</label>
-        <select id="format-hint">
-          <option value="" disabled selected>Select…</option>
+      <div class="row">
+        <label class="sr-only" for="format-hint">Document type</label>
+        <select id="format-hint" title="Document type">
+          <option value="" disabled selected>Document type…</option>
           <option value="typed">Typed</option>
           <option value="scanned">Scanned / printed</option>
           <option value="handwritten">Handwritten</option>
           <option value="auto">Not sure (detect, slower)</option>
         </select>
-      </div>
-      <div class="submit">
         <button type="submit" class="btn" id="upload-btn">Upload</button>
-        <span class="auto" id="type-note">Choosing the type makes uploading faster.</span>
       </div>
-      <p class="hint">PDF, Word, PowerPoint, text or image. You can also drag a file onto the page.</p>
+      <p class="auto" id="type-note">Choosing the type makes uploading faster.</p>
     </form>
     <p class="notice" id="upload-notice" role="status"></p>
-    <table class="files">
-      <thead><tr><th>Name</th><th>Type</th><th>Pages</th><th><span class="sr-only">Remove</span></th></tr></thead>
-      <tbody id="doc-list"></tbody>
-    </table>
+    <h3 class="list-title">Your files</h3>
+    <ul class="doc-list" id="doc-list"></ul>
   </aside>
 
-  <!-- Questions and answers -->
+  <!-- Chat -->
   <main class="panel chat" aria-labelledby="chat-title">
-    <div class="panel-head"><h2 id="chat-title">Questions &amp; answers</h2><span class="sub">Answers use only your uploaded documents</span></div>
+    <div class="panel-head"><h2 id="chat-title">Chat</h2><span class="sub">Answers come only from your uploaded files</span></div>
     <div class="messages" id="messages"><div class="thread" id="thread"></div></div>
     <div class="composer">
       <form id="ask-form">
         <label class="sr-only" for="question">Your question</label>
-        <textarea id="question" rows="1" placeholder="Type your question…"></textarea>
+        <textarea id="question" rows="1" placeholder="Ask a question about your documents…"></textarea>
         <button type="submit" class="btn" id="ask-btn">Ask</button>
       </form>
-      <p class="hint">Press Enter to ask, Shift + Enter for a new line. You can ask follow-up questions.</p>
+      <p class="hint">Enter to send, Shift + Enter for a new line. Follow-up questions work too.</p>
     </div>
   </main>
 </div>
@@ -293,6 +308,7 @@ const Server = {
 
 /* ---------- documents: upload, list, remove ---------- */
 const FORMAT = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
+const TEXT_TYPES = ["pdf", "docx", "pptx", "txt"];
 
 const Docs = {
   names: {},   // doc_id -> original file name
@@ -312,7 +328,7 @@ const Docs = {
     const list = $("doc-list");
     list.replaceChildren();
     $("doc-count").textContent = docs.length ? plural(docs.length, "file") : "";
-    if (!docs.length) list.append(h("tr", {}, h("td", { class: "empty", colspan: "4" }, "No documents uploaded yet.")));
+    if (!docs.length) list.append(h("li", { class: "empty" }, "Nothing uploaded yet."));
     for (const doc of docs) list.append(this.row(doc));
     Chat.refreshIntro();
   },
@@ -320,11 +336,17 @@ const Docs = {
   row(doc) {
     const name = this.fileName(doc);
     this.names[doc.doc_id] = name;
+    const ext = name.split(".").pop().toLowerCase();
+    const type = TEXT_TYPES.includes(ext) ? ext : "img";
     const open = h("button", { type: "button", class: "doc-name", title: `Open ${name}` }, name);
     open.addEventListener("click", () => Preview.open(doc.doc_id).catch((e) => this.notice(e.message, "error")));
     const remove = h("button", { type: "button", class: "textlink quiet", "aria-label": `Remove ${name}` }, "Remove");
     remove.addEventListener("click", () => this.remove(doc.doc_id, remove));
-    return h("tr", {}, h("td", {}, open), h("td", {}, FORMAT[doc.format_type]), h("td", {}, String(doc.page_count)), h("td", {}, remove));
+    return h("li", { class: "doc" },
+      h("span", { class: `type ${type}` }, type === "img" ? "IMG" : ext.toUpperCase()),
+      h("div", { class: "doc-main" }, open,
+        h("div", { class: "doc-meta" }, `${FORMAT[doc.format_type]} · ${plural(doc.page_count, "page")}`)),
+      remove);
   },
 
   async remove(id, button) {   // deletes straight away, no confirmation
@@ -468,9 +490,10 @@ const Chat = {
 
   intro() {
     return h("div", { class: "intro" },
-      h("p", {}, h("b", {}, Docs.hasAny() ? "No questions yet." : "No documents yet."), " ",
-        Docs.hasAny() ? "Type a question in the box below." : "Upload a document on the left, then ask a question below."),
-      h("p", {}, "Each answer is marked Certain, Moderate, Uncertain or Unreadable, depending on how well the source text matched and how clearly it could be read."));
+      h("h2", {}, Docs.hasAny() ? "Ask a question about your documents" : "Upload a document to begin"),
+      h("p", {}, "Every answer is labelled with how far you can trust it."),
+      h("div", { class: "tiers" },
+        ...["Certain", "Moderate", "Uncertain", "Unreadable"].map((t) => h("span", { class: `badge ${t}`, title: WHY[t] }, t))));
   },
   refreshIntro() { const i = $("thread").querySelector(".intro"); if (i) i.replaceWith(this.intro()); },
 
@@ -518,7 +541,7 @@ const Chat = {
     entry.className = "entry";
     const bubble = entry.querySelector(".bubble");
     bubble.querySelector(".a").replaceWith(this.renderAnswer(answer.answer_text));
-    bubble.append(h("p", { class: `verdict ${label}` }, "Reliability: ", h("b", {}, label), ` – ${WHY[label]}`));
+    bubble.append(h("div", { class: `verdict ${label}` }, h("span", { class: "badge" }, label), WHY[label]));
     if (sources.length) {
       const list = h("ol", {});
       sources.forEach((s, i) => list.append(this.source(s, i + 1)));
