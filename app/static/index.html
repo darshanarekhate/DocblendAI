@@ -8,175 +8,185 @@
 <style>
   :root {
     color-scheme: light;
-    --paper: #faf8f3;       /* main reading surface */
-    --paper-2: #f2eee5;     /* side pane, inputs */
-    --rule: #ddd6c8;        /* dividing lines */
-    --rule-dark: #c7bead;
-    --ink: #1d2733;         /* text */
-    --ink-2: #5d6673;       /* secondary text */
-    --ink-3: #8b929b;       /* hints */
-    --accent: #2d5b86;      /* the one action colour */
-    --accent-dark: #22476a;
-    --accent-wash: #e6edf4;
-    --green: #3f7a57;       /* scores and "Certain" */
-    --amber: #9a6a0a;
-    --slate: #56606c;
-    --red: #a8321f;
-    --red-wash: #f7e4df;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    --bg: #f3f6fa;          /* page background: light cool grey */
+    --panel: #ffffff;       /* panels */
+    --soft: #f7f9fc;        /* inputs, drop zone, sources */
+    --line: #e1e7ef;        /* borders */
+    --line-2: #cdd6e2;
+    --ink: #1f2a37;         /* text */
+    --ink-2: #5b6778;       /* secondary text */
+    --ink-3: #8a95a5;       /* hints */
+    --blue: #3a6ea5;        /* buttons, links */
+    --blue-dark: #2d5985;
+    --blue-soft: #e8f0f9;   /* question bubble, drag highlight */
+    --green: #2f7d5b;       /* confidence scores, "Certain" */
+    --green-soft: #e4f3ec;
+    --amber: #95650c;
+    --amber-soft: #faf0dc;
+    --slate: #556173;
+    --slate-soft: #eceff4;
+    --red: #b23b2a;
+    --red-soft: #fbe9e6;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", sans-serif;
   }
 
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
   h1, h2, h3, p { margin: 0; }
   button, input, select, textarea { font: inherit; color: inherit; }
-  a { color: var(--accent); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--blue); }
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   [hidden] { display: none !important; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  /* ---- buttons: one filled, one plain, one text-only ---- */
-  .btn { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; border: 1px solid var(--accent); border-radius: 4px; background: var(--accent);
-         color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; }
-  .btn:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
-  .btn.plain { background: var(--paper); color: var(--ink); border-color: var(--rule-dark); font-weight: 500; }
-  .btn.plain:hover:not(:disabled) { background: #fff; border-color: var(--ink-3); }
-  .textlink { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font-size: inherit;
-              text-decoration: underline; text-underline-offset: 2px; text-decoration-color: rgba(45, 91, 134, .35); }
-  .textlink:hover { text-decoration-color: currentColor; }
-  .textlink.quiet { color: var(--ink-3); text-decoration: none; }
-  .textlink.quiet:hover { color: var(--red); text-decoration: underline; }
-  select { height: 34px; padding: 0 8px; border: 1px solid var(--rule-dark); border-radius: 4px; background: var(--paper); font-size: 14px; }
+  /* ---- buttons ---- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 16px; border: 1px solid var(--blue);
+         border-radius: 6px; background: var(--blue); color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .btn:hover:not(:disabled) { background: var(--blue-dark); border-color: var(--blue-dark); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn.plain { background: var(--panel); color: var(--ink); border-color: var(--line-2); font-weight: 500; }
+  .btn.plain:hover:not(:disabled) { background: var(--soft); border-color: var(--ink-3); }
+  .textlink { border: 0; background: none; padding: 0; color: var(--blue); cursor: pointer; font-size: inherit; }
+  .textlink:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .textlink.quiet { color: var(--ink-3); }
+  .textlink.quiet:hover { color: var(--red); }
+  select { height: 36px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel); font-size: 14px; }
 
   /* ---- frame ---- */
-  .top { height: 52px; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-bottom: 1px solid var(--rule); background: var(--paper); }
-  .wordmark { font-family: var(--serif); font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
-  .top .note { font-size: 13.5px; color: var(--ink-2); }
+  .top { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 28px; height: 28px; border-radius: 6px; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+  .wordmark { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .top .note { font-size: 13.5px; color: var(--ink-3); padding-left: 14px; border-left: 1px solid var(--line); }
   .top .grow { flex: 1; }
   .tabs { display: none; }
-  .layout { height: calc(100% - 52px); display: grid; grid-template-columns: 330px minmax(0, 1fr); }
-  .pane-title { font-size: 11.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-2); }
+  .layout { height: calc(100% - 56px); display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; padding: 16px; }
+  .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .panel-head h2 { font-size: 15px; font-weight: 600; }
+  .panel-head .sub { font-size: 12.5px; color: var(--ink-3); }
 
-  /* ---- documents pane ---- */
-  .docs { display: flex; flex-direction: column; min-height: 0; background: var(--paper-2); border-right: 1px solid var(--rule); }
-  .docs-head { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 20px 10px; }
-  .docs-head .count { font-size: 12.5px; color: var(--ink-3); }
-  .upload { margin: 0 20px; padding: 14px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper);
-            transition: border-color .12s, background-color .12s; }
-  .upload.dragging { border-color: var(--accent); background: var(--accent-wash); }
-  .pick { display: flex; align-items: center; gap: 10px; }
-  .pick .chosen { min-width: 0; font-size: 13.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pick .chosen.set { color: var(--ink); font-weight: 500; }
+  /* ---- documents panel ---- */
+  .upload { margin: 16px 18px 0; }
+  .drop { display: block; padding: 18px 14px; border: 1.5px dashed var(--line-2); border-radius: 8px; background: var(--soft); text-align: center;
+          transition: border-color .12s, background-color .12s; }
+  .upload.dragging .drop { border-color: var(--blue); background: var(--blue-soft); }
+  .drop .big { font-weight: 600; font-size: 14.5px; }
+  .drop .small { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+  .drop .pick { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .chosen { max-width: 100%; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chosen.set { color: var(--ink); font-weight: 600; }
   .upload .row { display: flex; gap: 8px; margin-top: 10px; }
   .upload .row select { flex: 1; min-width: 0; }
-  .upload .hint { margin-top: 8px; font-size: 12.5px; color: var(--ink-3); }
-  .notice { margin: 10px 20px 0; font-size: 13.5px; color: var(--ink-2); }
+  .notice { margin: 10px 18px 0; padding: 8px 10px; border-radius: 6px; font-size: 13.5px; color: var(--ink-2); background: var(--soft); }
   .notice:empty { display: none; }
-  .notice.ok { color: var(--green); }
-  .notice.error { color: var(--red); }
+  .notice.ok { color: var(--green); background: var(--green-soft); }
+  .notice.error { color: var(--red); background: var(--red-soft); }
 
-  .doc-list { list-style: none; margin: 14px 0 0; padding: 0 20px 20px; overflow-y: auto; flex: 1; }
-  .doc { display: flex; align-items: baseline; gap: 10px; padding: 10px 0; border-top: 1px solid var(--rule); }
-  .doc:last-child { border-bottom: 1px solid var(--rule); }
+  .list-title { margin: 18px 18px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .doc-list { list-style: none; margin: 0; padding: 0 10px 14px; overflow-y: auto; flex: 1; }
+  .doc { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 6px; }
+  .doc:hover { background: var(--soft); }
+  .type { flex: none; width: 42px; padding: 3px 0; border-radius: 4px; font-size: 10.5px; font-weight: 700; text-align: center; letter-spacing: .03em;
+          color: var(--slate); background: var(--slate-soft); }
+  .type.pdf { color: var(--red); background: var(--red-soft); }
+  .type.docx, .type.pptx { color: var(--blue); background: var(--blue-soft); }
+  .type.img { color: var(--green); background: var(--green-soft); }
   .doc-main { flex: 1; min-width: 0; }
   .doc-name { display: block; max-width: 100%; border: 0; background: none; padding: 0; text-align: left; cursor: pointer;
-              font-size: 14.5px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .doc-name:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+              font-size: 14px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-name:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
   .doc-meta { font-size: 12.5px; color: var(--ink-3); }
   .doc .textlink { font-size: 12.5px; flex: none; }
-  .empty { padding: 12px 0; font-size: 14px; color: var(--ink-2); border-top: 1px solid var(--rule); }
+  .empty { padding: 10px 8px; font-size: 14px; color: var(--ink-3); }
 
-  /* ---- conversation pane ---- */
-  .chat { display: flex; flex-direction: column; min-height: 0; }
-  .messages { flex: 1; overflow-y: auto; }
-  .thread { max-width: 720px; margin: 0 auto; padding: 28px 28px 20px; }
-  .intro { padding: 8px 0 0; color: var(--ink-2); }
-  .intro h2 { font-family: var(--serif); font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
-  .intro ul { margin: 12px 0 0; padding-left: 18px; }
-  .intro li { margin-bottom: 4px; }
+  /* ---- chat panel ---- */
+  .messages { flex: 1; overflow-y: auto; background: var(--panel); }
+  .thread { max-width: 760px; margin: 0 auto; padding: 24px 24px 12px; }
+  .intro { max-width: 520px; margin: 40px auto 0; text-align: center; color: var(--ink-2); }
+  .intro h2 { font-size: 20px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .tiers { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+  .tier { font-size: 13px; color: var(--ink-2); }
 
-  .entry { padding: 20px 0 22px; border-bottom: 1px solid var(--rule); }
-  .entry:first-child { padding-top: 0; }
-  .entry .q { font-weight: 600; font-size: 15.5px; }
-  .entry .q::before { content: "Q."; color: var(--ink-3); font-weight: 600; margin-right: 8px; }
-  .entry .a { margin-top: 8px; font-family: var(--serif); font-size: 16.5px; line-height: 1.65; }
-  .entry .a p { margin-bottom: 10px; }
-  .entry .a p:last-child { margin-bottom: 0; }
-  .entry .a ul, .entry .a ol { margin: 0 0 10px; padding-left: 24px; }
-  .entry .a li { margin-bottom: 3px; }
-  .entry.pending .a { color: var(--ink-3); font-family: var(--sans); font-size: 14.5px; }
-  .entry.failed .a { color: var(--red); font-family: var(--sans); font-size: 14.5px; }
+  .entry { margin-bottom: 22px; }
+  .q { width: fit-content; max-width: 80%; margin-left: auto; padding: 9px 14px; border-radius: 10px 10px 2px 10px; background: var(--blue-soft);
+       color: var(--ink); white-space: pre-wrap; }
+  .bubble { margin-top: 10px; max-width: 92%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px 10px 10px 2px; background: var(--panel); }
+  .a { font-size: 15px; line-height: 1.65; }
+  .a p { margin-bottom: 10px; }
+  .a p:last-child { margin-bottom: 0; }
+  .a ul, .a ol { margin: 0 0 10px; padding-left: 22px; }
+  .a li { margin-bottom: 3px; }
+  .entry.pending .a { color: var(--ink-3); }
+  .entry.failed .bubble { border-color: #f0c9c1; background: var(--red-soft); }
+  .entry.failed .a { color: var(--red); }
 
-  .verdict { margin-top: 12px; font-size: 13.5px; color: var(--ink-2); }
-  .verdict b { color: var(--tone); font-weight: 700; }
-  .verdict b::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 6px; background: var(--tone); vertical-align: 0; }
-  .Certain { --tone: var(--green); }
-  .Moderate { --tone: var(--amber); }
-  .Uncertain { --tone: var(--slate); }
-  .Unreadable { --tone: var(--red); }
+  .verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line);
+             font-size: 13px; color: var(--ink-2); }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--tone); background: var(--tone-soft); }
+  .Certain { --tone: var(--green); --tone-soft: var(--green-soft); }
+  .Moderate { --tone: var(--amber); --tone-soft: var(--amber-soft); }
+  .Uncertain { --tone: var(--slate); --tone-soft: var(--slate-soft); }
+  .Unreadable { --tone: var(--red); --tone-soft: var(--red-soft); }
 
-  .sources { margin-top: 10px; font-size: 13.5px; }
-  .sources > summary { cursor: pointer; color: var(--accent); width: max-content; }
+  .sources { margin-top: 8px; font-size: 13px; }
+  .sources > summary { cursor: pointer; color: var(--blue); width: max-content; font-weight: 500; }
   .sources ol { margin: 8px 0 0; padding: 0; list-style: none; }
-  .sources li { padding: 6px 0; border-top: 1px dashed var(--rule); }
-  .sources li:first-child { border-top: 0; }
+  .sources li { padding: 8px 10px; margin-top: 6px; border-radius: 6px; background: var(--soft); }
   .ref { color: var(--ink-3); font-variant-numeric: tabular-nums; margin-right: 6px; }
   .src-name { font-weight: 600; }
   .scores { color: var(--ink-3); }
   .scores em { font-style: normal; color: var(--green); font-weight: 600; }
-  .sources blockquote { margin: 6px 0 2px; padding: 6px 10px; border-left: 2px solid var(--rule-dark); color: var(--ink-2);
+  .sources details summary { margin-top: 2px; }
+  .sources blockquote { margin: 6px 0 2px; padding: 6px 10px; border-left: 2px solid var(--line-2); background: var(--panel); color: var(--ink-2);
                         white-space: pre-wrap; max-height: 170px; overflow: auto; font-size: 13px; }
 
-  .composer { border-top: 1px solid var(--rule); background: var(--paper); }
-  .composer form { max-width: 720px; margin: 0 auto; padding: 14px 28px 6px; display: flex; gap: 10px; align-items: flex-end; }
-  .composer textarea { flex: 1; min-height: 40px; max-height: 160px; padding: 9px 11px; resize: none; line-height: 1.45;
-                       border: 1px solid var(--rule-dark); border-radius: 4px; background: #fff; font-size: 15px; overflow-y: hidden; }
-  .composer textarea:focus { outline: none; border-color: var(--accent); }
-  .composer .btn { height: 40px; padding: 0 18px; }
-  .composer .hint { max-width: 720px; margin: 0 auto; padding: 0 28px 12px; font-size: 12.5px; color: var(--ink-3); }
+  .composer { border-top: 1px solid var(--line); background: var(--soft); }
+  .composer form { max-width: 760px; margin: 0 auto; padding: 12px 24px 4px; display: flex; gap: 10px; align-items: flex-end; }
+  .composer textarea { flex: 1; min-height: 42px; max-height: 160px; padding: 10px 12px; resize: none; line-height: 1.45;
+                       border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); font-size: 15px; overflow-y: hidden; }
+  .composer textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
+  .composer .btn { height: 42px; padding: 0 20px; }
+  .composer .hint { max-width: 760px; margin: 0 auto; padding: 0 24px 10px; font-size: 12px; color: var(--ink-3); }
 
   /* ---- preview window ---- */
-  dialog.preview { width: min(780px, calc(100% - 32px)); padding: 0; border: 1px solid var(--rule-dark); border-radius: 6px;
-                   background: var(--paper); color: var(--ink); }
-  dialog.preview::backdrop { background: rgba(29, 39, 51, .4); }
+  dialog.preview { width: min(780px, calc(100% - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+  dialog.preview::backdrop { background: rgba(31, 42, 55, .35); }
   .pv { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
   .pv-head, .pv-foot { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
-  .pv-head { border-bottom: 1px solid var(--rule); }
+  .pv-head { border-bottom: 1px solid var(--line); }
   .pv-head h2 { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pv-body { overflow: auto; background: var(--paper-2); padding: 14px; }
-  .pv-body img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); background: #fff; }
-  .pv-body pre { margin: 0; padding: 18px 20px; border: 1px solid var(--rule); background: #fff; font: 15px/1.7 var(--serif); white-space: pre-wrap; }
-  .pv-foot { border-top: 1px solid var(--rule); justify-content: space-between; font-size: 13.5px; color: var(--ink-2); }
-  .pv-foot .btn { height: 30px; }
+  .pv-body { overflow: auto; background: var(--bg); padding: 14px; }
+  .pv-body img { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #fff; }
+  .pv-body pre { margin: 0; padding: 18px 20px; border: 1px solid var(--line); background: #fff; font: 15px/1.7 var(--sans); white-space: pre-wrap; }
+  .pv-foot { border-top: 1px solid var(--line); justify-content: space-between; font-size: 13.5px; color: var(--ink-2); }
+  .pv-foot .btn { height: 32px; }
 
-  /* ---- phones: Chat | Documents ---- */
+  /* ---- phones: Chat | Files ---- */
   @media (max-width: 860px) {
     .top { padding: 0 12px; gap: 10px; }
     .top .note { display: none; }
-    .wordmark { font-size: 18px; }
-    .tabs button { white-space: nowrap; }
-    .tabs { display: flex; margin-left: auto; border: 1px solid var(--rule-dark); border-radius: 4px; overflow: hidden; }
-    .tabs button { height: 30px; padding: 0 12px; border: 0; background: var(--paper); font-size: 14px; cursor: pointer; }
-    .tabs button + button { border-left: 1px solid var(--rule-dark); }
-    .tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+    .tabs { display: flex; margin-left: auto; border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden; }
+    .tabs button { height: 32px; padding: 0 12px; border: 0; background: var(--panel); font-size: 14px; cursor: pointer; white-space: nowrap; }
+    .tabs button + button { border-left: 1px solid var(--line-2); }
+    .tabs button[aria-selected="true"] { background: var(--blue); color: #fff; }
     .top .grow { display: none; }
-    .layout { grid-template-columns: minmax(0, 1fr); }
-    .docs { border-right: 0; }
+    .layout { grid-template-columns: minmax(0, 1fr); padding: 10px; gap: 10px; }
     body[data-tab="chat"] .docs, body[data-tab="docs"] .chat { display: none; }
-    .thread { padding: 20px 16px 16px; }
+    .thread { padding: 16px 14px 8px; }
+    .q { max-width: 90%; }
+    .bubble { max-width: 100%; }
     .composer form { padding: 10px 12px 4px; }
-    .composer .hint { padding: 0 12px 10px; }
+    .composer .hint { padding: 0 12px 8px; }
   }
 </style>
 </head>
 <body data-tab="chat">
 
 <header class="top">
-  <span class="wordmark">DocBlendAI</span>
-  <span class="note">Questions and answers over your typed, scanned and handwritten notes</span>
+  <div class="brand"><span class="mark" aria-hidden="true">D</span><span class="wordmark">DocBlendAI</span></div>
+  <span class="note">Ask questions about your typed, scanned and handwritten documents</span>
   <span class="grow"></span>
   <nav class="tabs" role="tablist" aria-label="View">
     <button type="button" role="tab" id="tab-chat" aria-selected="true">Chat</button>
@@ -186,12 +196,16 @@
 
 <div class="layout">
   <!-- Documents -->
-  <aside class="docs" aria-labelledby="docs-title">
-    <div class="docs-head"><h2 class="pane-title" id="docs-title">Documents</h2><span class="count" id="doc-count"></span></div>
+  <aside class="panel docs" aria-labelledby="docs-title">
+    <div class="panel-head"><h2 id="docs-title">Documents</h2><span class="sub" id="doc-count"></span></div>
     <form class="upload" id="upload-form">
-      <div class="pick">
-        <label class="btn plain" for="file">Choose file…</label>
-        <span class="chosen" id="chosen">No file chosen</span>
+      <div class="drop">
+        <p class="big">Drop a file here</p>
+        <p class="small">PDF, Word, PowerPoint, text or an image</p>
+        <div class="pick">
+          <label class="btn plain" for="file">Choose file…</label>
+          <span class="chosen" id="chosen">No file chosen</span>
+        </div>
       </div>
       <input type="file" id="file" class="sr-only" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
       <div class="row">
@@ -204,22 +218,23 @@
         </select>
         <button type="submit" class="btn" id="upload-btn">Upload</button>
       </div>
-      <p class="hint">PDF, Word, PowerPoint, text or an image. You can also drop a file anywhere on the page.</p>
     </form>
     <p class="notice" id="upload-notice" role="status"></p>
+    <h3 class="list-title">Your files</h3>
     <ul class="doc-list" id="doc-list"></ul>
   </aside>
 
-  <!-- Conversation -->
-  <main class="chat" aria-label="Questions and answers">
+  <!-- Chat -->
+  <main class="panel chat" aria-labelledby="chat-title">
+    <div class="panel-head"><h2 id="chat-title">Chat</h2><span class="sub">Answers come only from your uploaded files</span></div>
     <div class="messages" id="messages"><div class="thread" id="thread"></div></div>
     <div class="composer">
       <form id="ask-form">
         <label class="sr-only" for="question">Your question</label>
-        <textarea id="question" rows="1" placeholder="Type a question…"></textarea>
+        <textarea id="question" rows="1" placeholder="Ask a question about your documents…"></textarea>
         <button type="submit" class="btn" id="ask-btn">Ask</button>
       </form>
-      <p class="hint">Enter to ask, Shift + Enter for a new line. You can ask follow-up questions.</p>
+      <p class="hint">Enter to send, Shift + Enter for a new line. Follow-up questions work too.</p>
     </div>
   </main>
 </div>
@@ -289,7 +304,7 @@ const Server = {
 
 /* ---------- documents: upload, list, remove ---------- */
 const FORMAT = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
-const EXT = { pdf: "PDF", docx: "Word", pptx: "PowerPoint", txt: "Text" };
+const TEXT_TYPES = ["pdf", "docx", "pptx", "txt"];
 
 const Docs = {
   names: {},   // doc_id -> original file name
@@ -317,14 +332,16 @@ const Docs = {
   row(doc) {
     const name = this.fileName(doc);
     this.names[doc.doc_id] = name;
-    const kind = EXT[name.split(".").pop().toLowerCase()] || "Image";
+    const ext = name.split(".").pop().toLowerCase();
+    const type = TEXT_TYPES.includes(ext) ? ext : "img";
     const open = h("button", { type: "button", class: "doc-name", title: `Open ${name}` }, name);
     open.addEventListener("click", () => Preview.open(doc.doc_id).catch((e) => this.notice(e.message, "error")));
     const remove = h("button", { type: "button", class: "textlink quiet", "aria-label": `Remove ${name}` }, "Remove");
     remove.addEventListener("click", () => this.remove(doc.doc_id, remove));
     return h("li", { class: "doc" },
+      h("span", { class: `type ${type}` }, type === "img" ? "IMG" : ext.toUpperCase()),
       h("div", { class: "doc-main" }, open,
-        h("div", { class: "doc-meta" }, `${kind} · ${FORMAT[doc.format_type].toLowerCase()} · ${plural(doc.page_count, "page")}`)),
+        h("div", { class: "doc-meta" }, `${FORMAT[doc.format_type]} · ${plural(doc.page_count, "page")}`)),
       remove);
   },
 
@@ -436,10 +453,10 @@ const Preview = {
 /* ---------- chat: the current conversation only (nothing is saved) ----------
    The last few turns go with each question so follow-ups like "explain that" work. */
 const WHY = {
-  Certain: "strong match in clearly readable text.",
-  Moderate: "relevant text found, but the match was looser or the text was only partly legible.",
-  Uncertain: "no strong supporting passage; check the source before relying on this.",
-  Unreadable: "the relevant passage could not be read reliably (poor scan or handwriting).",
+  Certain: "Strong match in clearly readable text.",
+  Moderate: "Relevant text found, but the match was looser or the text only partly legible.",
+  Uncertain: "No strong supporting passage; check the source before relying on this.",
+  Unreadable: "The relevant passage could not be read reliably (poor scan or handwriting).",
 };
 
 const Chat = {
@@ -454,11 +471,9 @@ const Chat = {
   intro() {
     return h("div", { class: "intro" },
       h("h2", {}, Docs.hasAny() ? "Ask a question about your documents" : "Upload a document to begin"),
-      h("p", {}, "Answers come only from the documents you upload. Each one is marked with how far you can trust it:"),
-      h("ul", {},
-        h("li", {}, h("b", {}, "Certain"), " – found in clearly readable text"),
-        h("li", {}, h("b", {}, "Moderate"), " – probably right, but check it"),
-        h("li", {}, h("b", {}, "Uncertain"), " or ", h("b", {}, "Unreadable"), " – the source was weak or hard to read")));
+      h("p", {}, "Every answer is labelled with how far you can trust it."),
+      h("div", { class: "tiers" },
+        ...["Certain", "Moderate", "Uncertain", "Unreadable"].map((t) => h("span", { class: `badge ${t}`, title: WHY[t] }, t))));
   },
   refreshIntro() { const i = $("thread").querySelector(".intro"); if (i) i.replaceWith(this.intro()); },
 
@@ -492,29 +507,35 @@ const Chat = {
     }
     const pct = (v) => `${Math.round(v * 100)}%`;
     li.append(h("span", { class: "scores" }, " — match ", h("em", {}, pct(s.similarity)), ", readability ", h("em", {}, pct(s.confidence))),
-      h("details", {}, h("summary", { class: "textlink" }, "show passage"), h("blockquote", {}, s.text)));
+      h("details", {}, h("summary", { class: "textlink" }, "Show passage"), h("blockquote", {}, s.text)));
     return li;
+  },
+
+  entry(question, text, state) {
+    const bubble = h("div", { class: "bubble" }, h("div", { class: "a" }, text));
+    return h("div", { class: `entry ${state}` }, question ? h("p", { class: "q" }, question) : "", bubble);
   },
 
   fill(entry, answer, sources) {
     const label = answer.reliability_label;
     entry.className = "entry";
-    entry.querySelector(".a").replaceWith(this.renderAnswer(answer.answer_text));
-    entry.append(h("p", { class: `verdict ${label}` }, h("b", {}, label), ` — ${WHY[label]}`));
+    const bubble = entry.querySelector(".bubble");
+    bubble.querySelector(".a").replaceWith(this.renderAnswer(answer.answer_text));
+    bubble.append(h("div", { class: `verdict ${label}` }, h("span", { class: "badge" }, label), WHY[label]));
     if (sources.length) {
       const list = h("ol", {});
       sources.forEach((s, i) => list.append(this.source(s, i + 1)));
-      entry.append(h("details", { class: "sources" }, h("summary", {}, `Sources (${sources.length})`), list));
+      bubble.append(h("details", { class: "sources" }, h("summary", {}, `Sources (${sources.length})`), list));
     }
   },
 
-  fail(message) { $("thread").append(h("div", { class: "entry failed" }, h("div", { class: "a" }, message))); this.scroll(); },
+  fail(message) { $("thread").append(this.entry("", message, "failed")); this.scroll(); },
   scroll() { const m = $("messages"); m.scrollTop = m.scrollHeight; },
 
   async ask(text) {
     const thread = $("thread");
     thread.querySelector(".intro")?.remove();
-    const entry = h("div", { class: "entry pending" }, h("p", { class: "q" }, text), h("div", { class: "a" }, "Looking through your documents…"));
+    const entry = this.entry(text, "Looking through your documents…", "pending");
     thread.append(entry);
     this.scroll();
     try {
@@ -533,7 +554,7 @@ const Chat = {
     const q = $("question"), btn = $("ask-btn");
     const fit = () => {
       q.style.height = "auto";
-      q.style.height = `${Math.min(Math.max(q.scrollHeight, 40), 160)}px`;
+      q.style.height = `${Math.min(Math.max(q.scrollHeight, 42), 160)}px`;
       q.style.overflowY = q.scrollHeight > 160 ? "auto" : "hidden";   // scrollbar only when really needed
     };
     q.addEventListener("input", fit);
@@ -551,7 +572,7 @@ const Chat = {
   },
 };
 
-/* ---------- phones: Chat | Documents ---------- */
+/* ---------- phones: Chat | Files ---------- */
 const Tabs = {
   show(tab) {
     document.body.dataset.tab = tab;
