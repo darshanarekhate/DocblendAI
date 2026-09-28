@@ -4,396 +4,396 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DocBlendAI</title>
-<link rel="icon" href="data:,">
 <style>
   :root {
-    --bg: #f4f6f9;
-    --panel: #ffffff;
-    --line: #dfe4ea;
-    --ink: #1f2a37;
-    --muted: #6b7684;
-    --blue: #3a6ea5;
-    --blue-dark: #2d5985;
-    --blue-soft: #e8f0f9;
-    --green: #2f7d5b;
-    --amber: #95650c;
-    --slate: #556173;
-    --red: #b23b2a;
-    --sans: Calibri, Carlito, "Segoe UI", sans-serif;                   /* interface text */
-    --serif: "Times New Roman", Times, "Liberation Serif", serif;       /* headings and answers */
+    color-scheme: light dark;  /* native scrollbars and dropdowns follow the theme */
+    --bg: #f7f5f0; --panel: #ffffff; --text: #1f1e1b; --muted: #6b675f; --faint: #8d887e; --line: #e4dfd5;
+    --accent: #2f5d50; --accent-hover: #244a40; --accent-text: #ffffff; --accent-soft: #e8efec;
+    --field: #fbfaf7; --quote: #f4f1ea;
+    --certain: #2e7d4f; --certain-bg: #e8f3ec;
+    --moderate: #9a5b00; --moderate-bg: #fbf0dc;
+    --uncertain: #5f5b53; --uncertain-bg: #efece6;
+    --unreadable: #b3261e; --unreadable-bg: #fae7e4;
+    --error: #b3261e;
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1917; --panel: #23221f; --text: #ece9e2; --muted: #a8a397; --faint: #8a857a; --line: #37342f;
+      --accent: #86b8a8; --accent-hover: #9ccabb; --accent-text: #112019; --accent-soft: #28332f;
+      --field: #1e1d1a; --quote: #2a2925;
+      --certain: #7fcf9c; --certain-bg: #1f3027;
+      --moderate: #e7b565; --moderate-bg: #372b17;
+      --uncertain: #b9b4a9; --uncertain-bg: #2e2c28;
+      --unreadable: #f0907f; --unreadable-bg: #3a211d;
+      --error: #f0907f;
+    }
+  }
+
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--sans); }
-  h1, h2, p { margin: 0; }
-  h1, h2 { font-family: var(--serif); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); }
+  h1, h2 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.005em; }
   button, input, select, textarea { font: inherit; color: inherit; }
-  a { color: var(--blue); }
-  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  button, .choose { height: 36px; padding: 0 14px; border: 1px solid var(--blue); border-radius: 6px; background: var(--blue); color: #fff;
-                    font-size: 15px; cursor: pointer; }
-  button:hover:not(:disabled) { background: var(--blue-dark); }
-  button:disabled { opacity: .55; cursor: not-allowed; }
-  .choose { display: inline-flex; align-items: center; background: #fff; color: var(--ink); border-color: var(--line); }
-  .link { height: auto; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; }
-  .link:hover:not(:disabled) { background: none; color: var(--red); }
-  select { height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 15px; }
-
-  header { padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 24px; font-weight: 700; }
-
-  main { height: calc(100% - 61px); display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; padding: 16px; }
-  section { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
-  h2 { padding: 10px 16px; font-size: 18px; border-bottom: 1px solid var(--line); }
-
-  /* documents */
-  .docs { overflow-y: auto; }
-  form.upload { padding: 16px; display: grid; gap: 10px; }
-  form.upload.dragging { background: var(--blue-soft); }
-  .file-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  #chosen { min-width: 0; font-size: 14.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .type-row { display: flex; gap: 8px; }
-  .type-row select { flex: 1; min-width: 0; }
-  #status { padding: 0 16px 12px; font-size: 14.5px; color: var(--muted); }
-  #status:empty { display: none; }
-  #status.ok { color: var(--green); }
-  #status.error { color: var(--red); }
-  #doc-list { list-style: none; margin: 0; padding: 0 16px 16px; }
-  #doc-list li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
-  .doc-main { flex: 1; min-width: 0; }
-  .doc-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .doc-meta { font-size: 13.5px; color: var(--muted); }
-  #doc-list .empty { color: var(--muted); font-size: 15px; }
-
-  /* chat */
-  #messages { flex: 1; overflow-y: auto; padding: 16px; }
-  .intro { color: var(--muted); }
-  .entry { margin-bottom: 20px; }
-  .q { width: fit-content; max-width: 80%; margin-left: auto; padding: 8px 12px; border-radius: 8px; background: var(--blue-soft); white-space: pre-wrap; }
-  .answer { margin-top: 8px; max-width: 92%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; }
-  .a { font-family: var(--serif); font-size: 17px; line-height: 1.55; }
-  .a p { margin-bottom: 8px; }
-  .a p:last-child { margin-bottom: 0; }
-  .a ul, .a ol { margin: 0 0 8px; padding-left: 22px; }
-  .entry.pending .a { color: var(--muted); }
-  .entry.failed .a { color: var(--red); }
-  .label { margin-top: 10px; font-size: 14.5px; color: var(--muted); }
-  .label b { color: var(--tone); }
-  .Certain { --tone: var(--green); }
-  .Moderate { --tone: var(--amber); }
-  .Uncertain { --tone: var(--slate); }
-  .Unreadable { --tone: var(--red); }
-  .sources { margin-top: 6px; font-size: 14.5px; color: var(--muted); }
-  .sources summary { cursor: pointer; color: var(--blue); width: max-content; }
-  .sources ol { margin: 6px 0 0; padding-left: 20px; }
-  .sources em { font-style: normal; color: var(--green); }
-
-  form.ask { display: flex; gap: 8px; align-items: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); }
-  form.ask textarea { flex: 1; min-height: 40px; max-height: 160px; padding: 8px 10px; resize: none; line-height: 1.45;
-                      border: 1px solid var(--line); border-radius: 6px; overflow-y: hidden; }
-  form.ask textarea:focus { outline: none; border-color: var(--blue); }
-  form.ask button { height: 40px; }
-
-  /* phones: documents on top, chat below */
-  @media (max-width: 800px) {
-    main { height: auto; grid-template-columns: minmax(0, 1fr); padding: 10px; gap: 10px; }
-    .chat { min-height: 75vh; }
-    .q, .answer { max-width: 100%; }
+  /* --- page frame --- */
+  .top { border-bottom: 1px solid var(--line); background: var(--panel); }
+  .top-inner { max-width: 1160px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .top h1 { margin: 0; font-size: 24px; }
+  .top p { margin: 0; color: var(--muted); font-size: 15px; }
+  main { max-width: 1160px; margin: 0 auto; padding: 28px 24px 56px;
+         display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 880px) {
+    main { grid-template-columns: minmax(0, 1fr); padding: 20px 16px 40px; gap: 20px; }
+    .top-inner { padding: 14px 16px; }
   }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
+  .panel h2 { margin: 0 0 4px; font-size: 20px; }
+  .panel .lead { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+
+  /* --- buttons & fields --- */
+  .btn { border: 0; border-radius: 7px; padding: 10px 18px; font-weight: 600; font-size: 15px; cursor: pointer;
+         background: var(--accent); color: var(--accent-text); }
+  .btn:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .field-label { display: block; font-size: 14px; font-weight: 600; margin: 16px 0 6px; }
+  select, textarea { width: 100%; background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; }
+  select { font-size: 15px; }
+  textarea { resize: vertical; min-height: 96px; font-size: 16px; line-height: 1.5; }
+  .hint { font-size: 13px; color: var(--faint); margin: 6px 0 0; }
+  .status { font-size: 14px; color: var(--muted); margin: 12px 0 0; min-height: 1.4em; }
+  .status.error { color: var(--error); }
+  .status.ok { color: var(--certain); }
+
+  /* --- upload drop zone --- */
+  .drop { display: block; border: 1.5px dashed var(--line); border-radius: 9px; padding: 22px 16px; text-align: center;
+          background: var(--field); cursor: pointer; transition: border-color .15s, background .15s; }
+  .drop:hover, .drop.dragging { border-color: var(--accent); background: var(--accent-soft); }
+  .drop strong { display: block; font-size: 15px; }
+  .drop span { font-size: 13px; color: var(--muted); }
+  .drop .chosen { display: block; margin-top: 8px; font-size: 14px; color: var(--text); font-weight: 600; word-break: break-all; }
+  .upload-actions { display: flex; gap: 12px; align-items: end; margin-top: 4px; }
+  .upload-actions > div { flex: 1; }
+  .upload-actions .field-label { margin-top: 14px; }
+
+  /* --- document list --- */
+  .docs-head { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 8px;
+               padding-top: 18px; border-top: 1px solid var(--line); }
+  .docs-head h3 { margin: 0; font-size: 15px; }
+  .docs-head .count { font-size: 13px; color: var(--muted); }
+  ul.docs { list-style: none; margin: 0; padding: 0; }
+  ul.docs li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  ul.docs li:last-child { border-bottom: 0; }
+  .ftype { flex: none; width: 42px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+           color: var(--accent); border: 1px solid var(--line); border-radius: 5px; padding: 3px 0; background: var(--field); }
+  .doc-info { flex: 1; min-width: 0; }
+  .doc-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+  .doc-meta { display: block; font-size: 13px; color: var(--muted); }
+  .remove { flex: none; background: none; border: 0; color: var(--faint); font-size: 13px; cursor: pointer;
+            padding: 4px 6px; border-radius: 5px; text-decoration: underline; text-underline-offset: 2px; }
+  .remove:hover { color: var(--error); }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+  /* --- ask & answers --- */
+  .ask-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+  .ask-row .hint { margin: 0; }
+  .legend { margin-top: 16px; font-size: 14px; }
+  .legend summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+  .legend dl { margin: 10px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+  .legend dt { font-weight: 600; }
+  .legend dd { margin: 0; color: var(--muted); }
+
+  #answers { margin-top: 8px; }
+  .no-answers { margin-top: 24px; padding: 18px; border-radius: 9px; background: var(--quote); color: var(--muted); font-size: 15px; }
+  .answer { margin-top: 22px; padding: 18px 20px; border: 1px solid var(--line); border-left: 4px solid var(--tier);
+            border-radius: 9px; background: var(--panel); }
+  .answer.Certain { --tier: var(--certain); --tier-bg: var(--certain-bg); }
+  .answer.Moderate { --tier: var(--moderate); --tier-bg: var(--moderate-bg); }
+  .answer.Uncertain { --tier: var(--uncertain); --tier-bg: var(--uncertain-bg); }
+  .answer.Unreadable { --tier: var(--unreadable); --tier-bg: var(--unreadable-bg); }
+  .answer .q { margin: 0 0 10px; font-family: var(--serif); font-size: 18px; font-weight: 600; }
+  .answer .body { font-size: 16px; }
+  .answer .body p { margin: 0 0 10px; }
+  .answer .body ul, .answer .body ol { margin: 0 0 10px; padding-left: 22px; }
+  .answer .body li { margin-bottom: 4px; }
+  .trust { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding: 9px 12px;
+           border-radius: 7px; background: var(--tier-bg); font-size: 14px; }
+  .trust b { color: var(--tier); }
+  .trust span { color: var(--muted); }
+  .answer details { margin-top: 12px; }
+  .answer summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+  .source { margin-top: 12px; }
+  .source .where { font-size: 14px; font-weight: 600; }
+  .source .scores { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .source blockquote { margin: 6px 0 0; padding: 10px 12px; background: var(--quote); border-radius: 7px;
+                       font-size: 14px; line-height: 1.55; white-space: pre-wrap; max-height: 180px; overflow: auto; }
 </style>
 </head>
 <body>
-
-<header><h1>DocBlendAI</h1></header>
+<header class="top">
+  <div class="top-inner">
+    <h1>DocBlendAI</h1>
+    <p>Ask questions about your notes: typed, scanned or handwritten. Every answer tells you how far to trust it.</p>
+  </div>
+</header>
 
 <main>
-  <section class="docs" aria-labelledby="docs-title">
-    <h2 id="docs-title">Documents</h2>
-    <form class="upload" id="upload-form">
-      <div class="file-row">
-        <label class="choose" for="file">Choose file</label>
-        <span id="chosen">or drop a file here</span>
+  <section class="panel" aria-labelledby="docs-title">
+    <h2 id="docs-title">Your documents</h2>
+    <p class="lead">Add the notes you want to ask about.</p>
+    <form id="upload-form">
+      <label class="drop" id="drop" for="file">
+        <strong>Drag a file here, or click to choose</strong>
+        <span>PDF, Word, PowerPoint, text, or a photo/scan (JPG, PNG, TIFF, BMP, WEBP)</span>
+        <span class="chosen" id="chosen"></span>
+      </label>
+      <input type="file" id="file" class="visually-hidden" required
+             accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
+      <div class="upload-actions">
+        <div>
+          <label class="field-label" for="hint">Document type</label>
+          <select id="hint">
+            <option value="">Detect automatically</option>
+            <option value="typed">Typed (text can be selected)</option>
+            <option value="scanned">Scanned or printed</option>
+            <option value="handwritten">Handwritten</option>
+          </select>
+        </div>
+        <button type="submit" class="btn" id="upload-btn">Upload</button>
       </div>
-      <input type="file" id="file" class="sr-only" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
-      <div class="type-row">
-        <label class="sr-only" for="format-hint">Document type</label>
-        <select id="format-hint">
-          <option value="" disabled selected>Document type</option>
-          <option value="typed">Typed</option>
-          <option value="scanned">Scanned / printed</option>
-          <option value="handwritten">Handwritten</option>
-          <option value="auto">Detect automatically</option>
-        </select>
-        <button type="submit" id="upload-btn">Upload</button>
-      </div>
+      <p class="status" id="upload-status" role="status"></p>
     </form>
-    <p id="status" role="status"></p>
-    <ul id="doc-list"></ul>
+
+    <div class="docs-head">
+      <h3>Uploaded</h3>
+      <span class="count" id="doc-count"></span>
+    </div>
+    <ul class="docs" id="docs"></ul>
   </section>
 
-  <section class="chat" aria-labelledby="chat-title">
-    <h2 id="chat-title">Chat</h2>
-    <div id="messages"></div>
-    <form class="ask" id="ask-form">
-      <label class="sr-only" for="question">Your question</label>
-      <textarea id="question" rows="1" placeholder="Ask a question about your documents"></textarea>
-      <button type="submit" id="ask-btn">Ask</button>
+  <section class="panel" aria-labelledby="ask-title">
+    <h2 id="ask-title">Ask a question</h2>
+    <p class="lead">Answers come only from your uploaded documents.</p>
+    <form id="ask-form">
+      <label class="visually-hidden" for="question">Your question</label>
+      <textarea id="question" placeholder="e.g. What does second normal form remove?" required></textarea>
+      <div class="ask-row">
+        <p class="hint">Press Enter to ask, Shift + Enter for a new line.</p>
+        <button type="submit" class="btn" id="ask-btn">Ask</button>
+      </div>
+      <p class="status" id="ask-status" role="status"></p>
     </form>
+
+    <details class="legend">
+      <summary>What do the trust labels mean?</summary>
+      <dl>
+        <dt style="color: var(--certain)">Certain</dt><dd>Found in clearly readable text that matches the question well.</dd>
+        <dt style="color: var(--moderate)">Moderate</dt><dd>Probably right, but the match was looser or the text was partly hard to read.</dd>
+        <dt style="color: var(--uncertain)">Uncertain</dt><dd>No strong supporting passage. Check the source yourself.</dd>
+        <dt style="color: var(--unreadable)">Unreadable</dt><dd>The relevant page could not be read reliably (poor scan or handwriting).</dd>
+      </dl>
+    </details>
+
+    <div id="answers">
+      <p class="no-answers" id="no-answers">Your answers will appear here, newest first.</p>
+    </div>
   </section>
 </main>
 
 <script>
-const $ = (id) => document.getElementById(id);
-function h(tag, attrs = {}, ...children) {
+const WHY = {
+  Certain: "Strong match in clearly readable text.",
+  Moderate: "Relevant text found, but the match was looser or the text was only partly legible.",
+  Uncertain: "No strong supporting passage. Check the source before relying on this.",
+  Unreadable: "The relevant passage could not be read reliably (poor scan or handwriting).",
+};
+const FORMAT_LABEL = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
+const TYPE_TAG = { pdf: "PDF", docx: "DOCX", pptx: "PPTX", txt: "TXT" };
+
+// The server stores uploads as "<doc_id>_<original name>.<ext>"; recover the name from file_path.
+const docNames = {};
+function nameFromPath(doc) {
+  const base = doc.file_path.split(/[\\/]/).pop();
+  return base.startsWith(doc.doc_id + "_") ? base.slice(doc.doc_id.length + 1) : base;
+}
+function docLabel(id) { return docNames[id] || id.slice(0, 8); }
+function typeTag(name) { const ext = name.split(".").pop().toLowerCase(); return TYPE_TAG[ext] || "IMG"; }
+function pages(n) { return `${n} page${n === 1 ? "" : "s"}`; }
+
+function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) k === "class" ? (node.className = v) : node.setAttribute(k, v);
-  node.append(...children);
+  for (const c of children) node.append(c);
   return node;
 }
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/* ---------- server ----------
-   The page is normally served by the DocBlendAI server; if index.html is opened
-   directly, fall back to the default local server. */
-const Server = {
-  LOCAL: "http://127.0.0.1:8000",
-  DOWN: "Cannot reach the DocBlendAI server. Start it with: venv/Scripts/python -m uvicorn app.main:app --port 8000, then open http://localhost:8000",
-  base: null,
-  async find() {
-    if (this.base !== null) return;
-    const candidates = location.protocol.startsWith("http") ? [location.origin, this.LOCAL] : [this.LOCAL];
-    for (const base of candidates) {
-      try {
-        const r = await fetch(`${base}/health`);
-        if (r.ok && (await r.json()).status === "ok") { this.base = base === location.origin ? "" : base; return; }
-      } catch { /* try the next one */ }
+// Answers may use light Markdown (**bold**, lists). Escape first, then format: never inject raw HTML.
+function renderAnswer(text) {
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|\W)\*(\S.*?)\*(?=\W|$)/g, "$1<em>$2</em>");
+  let html = "", list = null;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    const bullet = line.match(/^[-*•]\s+(.*)/), numbered = line.match(/^\d+[.)]\s+(.*)/);
+    const kind = bullet ? "ul" : numbered ? "ol" : null;
+    if (list && kind !== list) { html += `</${list}>`; list = null; }
+    if (kind) {
+      if (!list) { html += `<${kind}>`; list = kind; }
+      html += `<li>${inline((bullet || numbered)[1])}</li>`;
+    } else if (line) {
+      html += `<p>${inline(line)}</p>`;
     }
-    throw new Error(this.DOWN);
-  },
-  url(path) { return `${this.base || ""}${path}`; },
-  async call(path, options = {}) {
-    await this.find();
-    let resp;
-    try { resp = await fetch(this.url(path), options); }
-    catch { this.base = null; throw new Error(this.DOWN); }
-    const body = resp.status === 204 ? {} : await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${resp.status})`);
-    return { body, status: resp.status };
-  },
-};
+  }
+  if (list) html += `</${list}>`;
+  const div = el("div", { class: "body" });
+  div.innerHTML = html;
+  return div;
+}
 
-/* ---------- documents ---------- */
-const FORMAT = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
-const TEXT_FILES = ["docx", "pptx", "txt"];   // always typed, and have no page images
-const extOf = (name) => name.split(".").pop().toLowerCase();
+async function api(path, options, withStatus = false) {
+  const resp = await fetch(path, options);
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${resp.status})`);
+  return withStatus ? { body, status: resp.status } : body;
+}
 
-const Docs = {
-  names: {},   // doc_id -> original file name
+function setStatus(id, text, kind = "") {
+  const s = document.getElementById(id);
+  s.className = `status ${kind}`.trim();
+  s.textContent = text;
+}
 
-  nameOf(id) { return this.names[id] || id.slice(0, 8); },
-  hasAny() { return Object.keys(this.names).length > 0; },
-  hasPages(id) { return !TEXT_FILES.includes(extOf(this.nameOf(id))); },
-  pageUrl(id, page) { return Server.url(`/documents/${id}/pages/${page}`); },
-  status(text, kind = "") { const s = $("status"); s.className = kind; s.textContent = text; },
+async function deleteDoc(d, button) {
+  if (!confirm(`Remove "${docLabel(d.doc_id)}"? It is removed from DocBlendAI only; your original file is not touched.`)) return;
+  button.disabled = true;
+  try {
+    await api(`/documents/${d.doc_id}`, { method: "DELETE" });
+    setStatus("upload-status", `Removed ${docLabel(d.doc_id)}.`);
+    await loadDocs();
+  } catch (err) {
+    button.disabled = false;
+    setStatus("upload-status", err.message, "error");
+  }
+}
 
-  fileName(doc) {  // stored as "<doc_id>_<original name>"
-    const base = doc.file_path.split(/[\\/]/).pop();
-    return base.startsWith(doc.doc_id + "_") ? base.slice(doc.doc_id.length + 1) : base;
-  },
+async function loadDocs() {
+  const list = document.getElementById("docs");
+  const docs = await api("/documents");
+  list.replaceChildren();
+  document.getElementById("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
+  if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
+  for (const d of docs) {
+    const name = nameFromPath(d);
+    docNames[d.doc_id] = name;
+    const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
+    remove.addEventListener("click", () => deleteDoc(d, remove));
+    list.append(el("li", {},
+      el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(name)),
+      el("span", { class: "doc-info" },
+        el("span", { class: "doc-name", title: name }, name),
+        el("span", { class: "doc-meta" }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)),
+      remove));
+  }
+}
 
-  async load() {
-    const docs = (await Server.call("/documents")).body;
-    this.names = {};
-    const list = $("doc-list");
-    list.replaceChildren();
-    if (!docs.length) list.append(h("li", { class: "empty" }, "No documents yet."));
-    for (const doc of docs) list.append(this.row(doc));
-    Chat.intro();
-  },
+// --- upload: click or drag a file onto the drop zone ---
+const fileInput = document.getElementById("file"), drop = document.getElementById("drop");
+function showChosen() {
+  const f = fileInput.files[0];
+  document.getElementById("chosen").textContent = f ? f.name : "";
+}
+fileInput.addEventListener("change", showChosen);
+// A file dropped anywhere on the page goes to the upload box (instead of the browser
+// opening it and leaving the app); the box lights up while a file is dragged over the page.
+const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+window.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); drop.classList.add("dragging"); } });
+window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) drop.classList.remove("dragging"); });
+window.addEventListener("drop", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  drop.classList.remove("dragging");
+  if (e.dataTransfer.files.length) {
+    fileInput.files = e.dataTransfer.files;
+    showChosen();
+    setStatus("upload-status", "File ready. Press Upload.");
+    drop.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+});
 
-  row(doc) {
-    const name = this.fileName(doc);
-    this.names[doc.doc_id] = name;
-    // PDFs and images open their first page in a new tab; Word/PowerPoint/text have no page images.
-    const title = this.hasPages(doc.doc_id)
-      ? h("a", { class: "doc-name", href: this.pageUrl(doc.doc_id, 1), target: "_blank", rel: "noopener" }, name)
-      : h("span", { class: "doc-name" }, name);
-    const remove = h("button", { type: "button", class: "link", "aria-label": `Remove ${name}` }, "Remove");
-    remove.addEventListener("click", () => this.remove(doc.doc_id, remove));
-    return h("li", {},
-      h("div", { class: "doc-main" }, title,
-        h("div", { class: "doc-meta" }, `${FORMAT[doc.format_type]} · ${plural(doc.page_count, "page")}`)),
-      remove);
-  },
-
-  async remove(id, button) {   // deletes straight away, no confirmation
-    button.disabled = true;
-    const name = this.nameOf(id);
-    try {
-      await Server.call(`/documents/${id}`, { method: "DELETE" });
-      this.status(`Removed ${name}.`);
-      await this.load();
-    } catch (e) {
-      button.disabled = false;
-      this.status(e.message, "error");
+document.getElementById("upload-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const file = fileInput.files[0];
+  if (!file) { setStatus("upload-status", "Choose a file first.", "error"); return; }
+  const btn = document.getElementById("upload-btn");
+  const form = new FormData();
+  form.append("file", file);
+  const hint = document.getElementById("hint").value;
+  if (hint) form.append("format_hint", hint);
+  btn.disabled = true; btn.textContent = "Uploading…";
+  setStatus("upload-status", "Reading the file. Scanned and handwritten pages can take a minute.");
+  try {
+    const { body: doc, status: code } = await api("/upload", { method: "POST", body: form }, true);
+    await loadDocs();
+    if (code === 200) {
+      setStatus("upload-status", `Already uploaded as ${docLabel(doc.doc_id)}, so it was not added again.`);
+    } else {
+      setStatus("upload-status", `Added: ${FORMAT_LABEL[doc.format_type].toLowerCase()}, ${pages(doc.page_count)}.`, "ok");
     }
-  },
+    e.target.reset(); showChosen();
+  } catch (err) {
+    setStatus("upload-status", err.message, "error");
+  } finally { btn.disabled = false; btn.textContent = "Upload"; }
+});
 
-  async upload(file) {
-    const form = new FormData();
-    form.append("file", file);
-    const hint = $("format-hint").value;
-    if (hint && hint !== "auto" && !TEXT_FILES.includes(extOf(file.name))) form.append("format_hint", hint);
-    const btn = $("upload-btn");
-    btn.disabled = true; btn.textContent = "Uploading…";
-    this.status("Reading the file. Scanned and handwritten pages take longer.");
-    try {
-      const { body: doc, status } = await Server.call("/upload", { method: "POST", body: form });
-      await this.load();
-      if (status === 200) this.status(`Already uploaded as ${this.nameOf(doc.doc_id)}.`);
-      else this.status(`Added ${this.nameOf(doc.doc_id)} (${FORMAT[doc.format_type].toLowerCase()}, ${plural(doc.page_count, "page")}).`, "ok");
-      $("upload-form").reset(); this.showChosen();
-    } catch (e) {
-      this.status(e.message, "error");
-    } finally { btn.disabled = false; btn.textContent = "Upload"; }
-  },
+// --- ask ---
+function sourceView(s) {
+  const where = [docLabel(s.doc_id), s.page ? `page ${s.page}` : null].filter(Boolean).join(", ");
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  return el("div", { class: "source" },
+    el("div", { class: "where" }, where, " ",
+      el("span", { class: "scores" }, `· match ${pct(s.similarity)} · readability ${pct(s.confidence)}`)),
+    el("blockquote", {}, s.text));
+}
 
-  showChosen() {
-    const f = $("file").files[0], select = $("format-hint");
-    $("chosen").textContent = f ? f.name : "or drop a file here";
-    const typedOnly = !!f && TEXT_FILES.includes(extOf(f.name));
-    if (typedOnly) select.value = "typed";
-    else if (select.disabled) select.value = "";
-    select.disabled = typedOnly;   // Word, PowerPoint and text files are always typed
-  },
+const question = document.getElementById("question");
+question.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); document.getElementById("ask-form").requestSubmit(); }
+});
 
-  init() {
-    $("file").addEventListener("change", () => this.showChosen());
-    $("upload-form").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const file = $("file").files[0];
-      if (!file) { this.status("Choose a file first.", "error"); return; }
-      if (!$("format-hint").value) { this.status("Choose the document type.", "error"); return; }
-      this.upload(file);
+document.getElementById("ask-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = question.value.trim();
+  if (!text) return;
+  const btn = document.getElementById("ask-btn");
+  btn.disabled = true; btn.textContent = "Thinking…";
+  setStatus("ask-status", "");
+  try {
+    const answer = await api("/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query_id: crypto.randomUUID(), question_text: text, user_id: "web" }),
     });
-    // A file dropped anywhere on the page goes to the upload form.
-    const box = $("upload-form");
-    const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
-    window.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); box.classList.add("dragging"); } });
-    window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) box.classList.remove("dragging"); });
-    window.addEventListener("drop", (e) => {
-      if (!hasFiles(e)) return;
-      e.preventDefault();
-      box.classList.remove("dragging");
-      if (!e.dataTransfer.files.length) return;
-      $("file").files = e.dataTransfer.files;
-      this.showChosen();
-    });
-  },
-};
-
-/* ---------- chat (nothing is saved; the last turns go along for follow-up questions) ---------- */
-const WHY = {
-  Certain: "strong match in clearly readable text.",
-  Moderate: "relevant text found, but the match was looser or the text only partly legible.",
-  Uncertain: "no strong supporting passage; check the source.",
-  Unreadable: "the source could not be read reliably.",
-};
-
-const Chat = {
-  turns: [],
-
-  intro() {
-    const box = $("messages");
-    if (box.querySelector(".entry")) return;
-    box.replaceChildren(h("p", { class: "intro" },
-      Docs.hasAny() ? "Ask a question about your documents." : "Upload a document, then ask a question about it."));
-  },
-
-  // Light Markdown (**bold**, lists) from the model. Escape first; never inject raw HTML.
-  render(text) {
-    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    let html = "", list = null;
-    for (const raw of text.split("\n")) {
-      const line = raw.trim();
-      const bullet = line.match(/^[-*•]\s+(.*)/), numbered = line.match(/^\d+[.)]\s+(.*)/);
-      const kind = bullet ? "ul" : numbered ? "ol" : null;
-      if (list && kind !== list) { html += `</${list}>`; list = null; }
-      if (kind) { if (!list) { html += `<${kind}>`; list = kind; } html += `<li>${inline((bullet || numbered)[1])}</li>`; }
-      else if (line) html += `<p>${inline(line)}</p>`;
+    const sources = await api(`/answer/${answer.answer_id}/sources`);
+    const label = answer.reliability_label;
+    const card = el("article", { class: `answer ${label}` },
+      el("p", { class: "q" }, text),
+      renderAnswer(answer.answer_text),
+      el("div", { class: "trust" }, el("b", {}, label), el("span", {}, WHY[label])));
+    if (sources.length) {
+      const details = el("details", {}, el("summary", {}, `Show where this came from (${sources.length})`));
+      sources.forEach((s) => details.append(sourceView(s)));
+      card.append(details);
     }
-    if (list) html += `</${list}>`;
-    const div = h("div", { class: "a" });
-    div.innerHTML = html;
-    return div;
-  },
+    document.getElementById("no-answers")?.remove();
+    document.getElementById("answers").prepend(card);
+    question.value = "";
+  } catch (err) {
+    setStatus("ask-status", err.message, "error");
+  } finally { btn.disabled = false; btn.textContent = "Ask"; question.focus(); }
+});
 
-  source(s) {
-    let where = s.page ? `p. ${s.page}` : "";
-    if (s.page && s.first_line) where += s.last_line && s.last_line !== s.first_line ? `, lines ${s.first_line}–${s.last_line}` : `, line ${s.first_line}`;
-    const place = where && Docs.hasPages(s.doc_id)
-      ? h("a", { href: Docs.pageUrl(s.doc_id, s.page), target: "_blank", rel: "noopener" }, where)
-      : where;
-    const pct = (v) => `${Math.round(v * 100)}%`;
-    return h("li", { title: s.text }, `${Docs.nameOf(s.doc_id)}${where ? ", " : ""}`, place,
-      " — match ", h("em", {}, pct(s.similarity)), ", readability ", h("em", {}, pct(s.confidence)));
-  },
-
-  async ask(text) {
-    const box = $("messages");
-    box.querySelector(".intro")?.remove();
-    const answer = h("div", { class: "answer" }, h("div", { class: "a" }, "Looking through your documents…"));
-    const entry = h("div", { class: "entry pending" }, h("p", { class: "q" }, text), answer);
-    box.append(entry);
-    box.scrollTop = box.scrollHeight;
-    try {
-      const reply = (await Server.call("/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question_text: text, history: this.turns.slice(-3) }),
-      })).body;
-      this.turns.push({ question: text, answer: reply.answer.answer_text });
-      const label = reply.answer.reliability_label;
-      entry.className = "entry";
-      answer.replaceChildren(this.render(reply.answer.answer_text),
-        h("p", { class: `label ${label}` }, h("b", {}, label), ` – ${WHY[label]}`));
-      if (reply.sources.length) {
-        answer.append(h("details", { class: "sources" }, h("summary", {}, `Sources (${reply.sources.length})`),
-          h("ol", {}, ...reply.sources.map((s) => this.source(s)))));
-      }
-      return true;
-    } catch (e) {
-      entry.className = "entry failed";
-      answer.querySelector(".a").textContent = e.message;
-      return false;
-    } finally { box.scrollTop = box.scrollHeight; }
-  },
-
-  init() {
-    const q = $("question"), btn = $("ask-btn");
-    const fit = () => {
-      q.style.height = "auto";
-      q.style.height = `${Math.min(Math.max(q.scrollHeight, 40), 160)}px`;
-      q.style.overflowY = q.scrollHeight > 160 ? "auto" : "hidden";
-    };
-    q.addEventListener("input", fit);
-    q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask-form").requestSubmit(); } });
-    $("ask-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const text = q.value.trim();
-      if (!text || btn.disabled) return;
-      btn.disabled = true;
-      q.value = ""; fit();
-      if (!(await this.ask(text)) && !q.value) { q.value = text; fit(); }   // keep a failed question
-      btn.disabled = false; q.focus();
-    });
-  },
-};
-
-Docs.init(); Chat.init();
-Chat.intro();
-Docs.load().catch((e) => Docs.status(e.message, "error"));
+loadDocs().catch((err) => setStatus("upload-status", err.message, "error"));
 </script>
 </body>
 </html>
