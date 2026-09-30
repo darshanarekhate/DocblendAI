@@ -72,7 +72,9 @@
   .docs-head h3 { margin: 0; font-size: 15px; }
   .docs-head .count { font-size: 13px; color: var(--muted); }
   ul.docs { list-style: none; margin: 0; padding: 0; }
-  ul.docs li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  ul.docs li { display: flex; align-items: center; gap: 12px; padding: 10px 6px; border-bottom: 1px solid var(--line); border-radius: 6px; }
+  ul.docs li.doc { cursor: pointer; }
+  ul.docs li.doc:hover { background: var(--accent-soft); }
   ul.docs li:last-child { border-bottom: 0; }
   .ftype { flex: none; width: 42px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
            color: var(--accent); border: 1px solid var(--line); border-radius: 5px; padding: 3px 0; background: var(--field); }
@@ -280,15 +282,18 @@ async function loadDocs() {
     const viewUrl = `/documents/${d.doc_id}/view`;   // icon, name and View all open the document (same tab)
     docNames[d.doc_id] = name;
     const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
-    remove.addEventListener("click", () => deleteDoc(d, remove));
-    list.append(el("li", {},
+    remove.addEventListener("click", (e) => { e.stopPropagation(); deleteDoc(d, remove); });
+    const row = el("li", { class: "doc", title: `Open ${name}` },
       el("a", { class: "ftype", href: viewUrl, tabindex: "-1", "aria-hidden": "true" }, typeTag(name)),
       el("span", { class: "doc-info" },
         el("a", { class: "doc-name", href: viewUrl, title: `Open ${name}` }, name),
         el("span", { class: "doc-meta" }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)),
       el("a", { class: "view", href: viewUrl,
                 "aria-label": `View ${name}` }, "View"),
-      remove));
+      remove);
+    // Clicking anywhere on the row opens the document (links inside already do; Remove stops the click).
+    row.addEventListener("click", (e) => { if (!e.target.closest("a, button")) location.href = viewUrl; });
+    list.append(row);
   }
 }
 
