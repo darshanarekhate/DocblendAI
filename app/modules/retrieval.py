@@ -41,8 +41,12 @@ def combined_score(similarity: float, confidence: float) -> float:
     return w * similarity + (1 - w) * confidence
 
 
-def retrieve(query: Query, top_k: int = 5) -> list[tuple[RecognizedChunk, RetrievalResult]]:
+def retrieve(
+    query: Query, top_k: int = 5, doc_ids: list[str] | None = None
+) -> list[tuple[RecognizedChunk, RetrievalResult]]:
     """Return the top_k chunks and their scores, best combined_score first.
+
+    doc_ids: answer only from these documents (the ones the user selected); None = all.
 
     Raises embedder.EmbeddingError if the question cannot be embedded.
     """
@@ -50,7 +54,7 @@ def retrieve(query: Query, top_k: int = 5) -> list[tuple[RecognizedChunk, Retrie
     wanted = top_k * settings.candidate_multiplier
     pool = wanted
     while True:
-        hits = vector_store.search(query_vector, pool)
+        hits = vector_store.search(query_vector, pool, doc_ids)
         # Identical chunks (e.g. one file uploaded twice) would fill every slot with the same
         # passage; widen the pool until it holds enough different ones or the store runs out.
         if len({_text_key(c) for c, _ in hits}) >= wanted or len(hits) < pool or pool >= MAX_POOL:

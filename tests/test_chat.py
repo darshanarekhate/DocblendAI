@@ -44,7 +44,7 @@ def test_follow_up_also_searches_with_the_previous_question(client, pdf_file, fa
     _upload(client, pdf_file(PAGES))
     searched = []
     original = retrieval.retrieve
-    monkeypatch.setattr(retrieval, "retrieve", lambda q, k=5: searched.append(q.question_text) or original(q, k))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, k=5, *rest: searched.append(q.question_text) or original(q, k, *rest))
     _chat(client, "And the parser?", [{"question": "What does lexical analysis convert?", "answer": "Tokens."}])
     assert searched == ["And the parser?", "What does lexical analysis convert?\nAnd the parser?"]
 
