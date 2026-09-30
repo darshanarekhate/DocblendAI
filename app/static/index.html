@@ -98,7 +98,10 @@
   .viewer-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .viewer-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .viewer .close { background: none; border: 0; padding: 0; color: var(--accent); font-size: 15px; cursor: pointer; text-decoration: underline; }
+  /* the pages scroll inside the panel, so the panel stays one screen tall */
+  #viewer-pages { max-height: calc(100vh - 230px); min-height: 260px; overflow-y: auto; padding-right: 6px; }
   .viewer .page-no { margin: 18px 0 6px; font-size: 14px; color: var(--muted); }
+  .viewer .page-no:first-child { margin-top: 0; }
   .viewer img, .viewer pre { display: block; width: 100%; margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
   .viewer pre { padding: 16px 18px; white-space: pre-wrap; font: 16px/1.6 var(--serif); }
 
