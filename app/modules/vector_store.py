@@ -61,11 +61,19 @@ def add_chunks(doc_id: str, chunks: list[RecognizedChunk], locations: dict[str, 
     )
 
 
-def search(query_vector: list[float], top_k: int = 5) -> list[tuple[RecognizedChunk, float]]:
-    """Return the top_k nearest chunks with cosine similarity (1 = identical), best first."""
+def search(
+    query_vector: list[float], top_k: int = 5, doc_ids: list[str] | None = None
+) -> list[tuple[RecognizedChunk, float]]:
+    """Return the top_k nearest chunks with cosine similarity (1 = identical), best first.
+
+    doc_ids: search only these documents (None = all). An empty list finds nothing.
+    """
+    if doc_ids is not None and not doc_ids:
+        return []
     res = _get().query(
         query_embeddings=[query_vector],
         n_results=top_k,
+        where={"doc_id": {"$in": list(doc_ids)}} if doc_ids is not None else None,
         include=["documents", "metadatas", "distances", "embeddings"],
     )
     results = []

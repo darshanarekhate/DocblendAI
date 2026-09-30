@@ -10,6 +10,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Query as QueryParam  # schemas.Query is the synopsis entity
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -27,26 +28,30 @@ router = APIRouter(tags=["query"])
 Turn = tuple[str, str]  # (question, answer) from earlier in a conversation
 
 
-def _retrieve(query: Query, history: list[Turn] | None):
+def _retrieve(query: Query, history: list[Turn] | None, doc_ids: list[str] | None = None):
     """Retrieve for the question; in a conversation, also for (previous question + this one).
 
     A follow-up like "explain it in more detail" has nothing to match on its own,
     so the previous question is searched with it and the better-scored chunks win.
     A self-contained new question still finds its own chunks through the first search.
     """
-    hits = retrieval.retrieve(query, settings.top_k)
+    hits = retrieval.retrieve(query, settings.top_k, doc_ids)
     if not history:
         return hits
     follow_up = query.model_copy(update={"question_text": f"{history[-1][0]}\n{query.question_text}"})
     best = {chunk.chunk_id: (chunk, result) for chunk, result in hits}
-    for chunk, result in retrieval.retrieve(follow_up, settings.top_k):
+    for chunk, result in retrieval.retrieve(follow_up, settings.top_k, doc_ids):
         if chunk.chunk_id not in best or result.combined_score > best[chunk.chunk_id][1].combined_score:
             best[chunk.chunk_id] = (chunk, result)
     return sorted(best.values(), key=lambda pair: pair[1].combined_score, reverse=True)[: settings.top_k]
 
 
-def answer_and_store(query: Query, db: Session, history: list[Turn] | None = None) -> Answer:
+def answer_and_store(
+    query: Query, db: Session, history: list[Turn] | None = None, doc_ids: list[str] | None = None
+) -> Answer:
     """Modules 5 -> 6 -> 7 for one question, then store Query, Answer, and RetrievalResults.
+
+    doc_ids: answer only from these documents (None = all uploaded documents).
 
     Raises HTTPException 409 for a reused query_id and 502 if Gemini fails.
     """
@@ -54,7 +59,7 @@ def answer_and_store(query: Query, db: Session, history: list[Turn] | None = Non
         raise HTTPException(status.HTTP_409_CONFLICT, f"query_id {query.query_id!r} already exists")
 
     try:
-        hits = _retrieve(query, history)
+        hits = _retrieve(query, history, doc_ids)
         results = [r for _, r in hits]
         label = reliability.classify_reliability(results)
         answer = llm_answer.generate_answer(query, [c for c, _ in hits], label, history=history)
@@ -73,8 +78,12 @@ def answer_and_store(query: Query, db: Session, history: list[Turn] | None = Non
 
 # Plain `def`: embedding and generation are blocking network calls, so FastAPI runs this in its threadpool.
 @router.post("/ask", response_model=Answer)
-def ask(query: Query, db: Session = Depends(get_db)) -> Answer:
-    return answer_and_store(query, db)
+def ask(
+    query: Query,
+    doc_id: list[str] | None = QueryParam(None, description="Answer only from these documents (repeat the parameter); default: all"),
+    db: Session = Depends(get_db),
+) -> Answer:
+    return answer_and_store(query, db, doc_ids=doc_id)
 
 
 @router.get("/answer/{answer_id}", response_model=Answer)
@@ -151,6 +160,7 @@ class ChatTurn(BaseModel):
 class ChatRequest(BaseModel):
     question_text: str = Field(min_length=1)
     history: list[ChatTurn] = Field(default_factory=list, description="Earlier turns, oldest first")
+    doc_ids: list[str] | None = Field(None, description="Answer only from these documents; default: all")
 
 
 class ChatReply(BaseModel):
@@ -166,5 +176,5 @@ CHAT_CONTEXT_TURNS = 3
 def chat(body: ChatRequest, db: Session = Depends(get_db)) -> ChatReply:
     query = Query(query_id=uuid.uuid4().hex, question_text=body.question_text.strip(), user_id=CHAT_USER)
     history = [(t.question, t.answer) for t in body.history[-CHAT_CONTEXT_TURNS:]]
-    answer = answer_and_store(query, db, history=history)
+    answer = answer_and_store(query, db, history=history, doc_ids=body.doc_ids)
     return ChatReply(answer=answer, sources=sources_for_query(query.query_id, db))
