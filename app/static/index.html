@@ -90,8 +90,10 @@
   .view { flex: none; color: var(--accent); font-size: 13px; padding: 4px 6px; text-underline-offset: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
 
-  /* --- document shown on the page, below the two panels --- */
-  .viewer { grid-column: 1 / -1; }
+  /* --- document shown on the page, in the right-hand column in place of "Ask a question" --- */
+  .viewer { grid-column: 2; grid-row: 1; }
+  @media (max-width: 880px) { .viewer { grid-column: 1; grid-row: auto; } }
+  .ask[hidden] { display: none; }
   .viewer[hidden] { display: none; }
   .viewer-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .viewer-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -177,7 +179,7 @@
     <ul class="docs" id="docs"></ul>
   </section>
 
-  <section class="panel" aria-labelledby="ask-title">
+  <section class="panel ask" id="ask-panel" aria-labelledby="ask-title">
     <h2 id="ask-title">Ask a question</h2>
     <p class="lead">Answers come only from your uploaded documents.</p>
     <form id="ask-form">
@@ -294,17 +296,20 @@ async function showDoc(id) {
   const viewer = document.getElementById("viewer");
   viewer.dataset.docId = id;
   viewer.hidden = false;
-  viewer.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById("ask-panel").hidden = true;   // the document takes the question panel's place
+  if (viewer.getBoundingClientRect().top < 0 || viewer.getBoundingClientRect().top > innerHeight / 2) {
+    viewer.scrollIntoView({ behavior: "smooth", block: "start" });   // phones: panels are stacked
+  }
 }
 function hideDoc() {
   const viewer = document.getElementById("viewer");
   viewer.hidden = true;
+  document.getElementById("ask-panel").hidden = false;
   delete viewer.dataset.docId;
   document.getElementById("viewer-pages").replaceChildren();
 }
 document.getElementById("viewer-close").addEventListener("click", () => {
   hideDoc();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
 async function deleteDoc(d, button) {
