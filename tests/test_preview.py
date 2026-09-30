@@ -69,7 +69,7 @@ def test_view_docx_shows_text_escaped(client, tmp_path) -> None:
 
 
 def test_frontend_links_to_view(client) -> None:
-    assert "/view`" in client.get("/").text
+    assert "/view`" in client.get("/").text and "href: viewUrl" in client.get("/").text
 
 
 def test_local_pages_opened_outside_the_server_may_call_the_api(client) -> None:
