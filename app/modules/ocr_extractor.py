@@ -24,6 +24,7 @@ import pytesseract
 from PIL import Image
 
 from app.config import settings
+from app.modules.file_types import FileKind, kind_of
 from app.modules.pdf_render import denoise, render_pages
 
 logger = logging.getLogger(__name__)
@@ -179,10 +180,18 @@ def auto_orient(page: Image.Image) -> Image.Image:
     return best
 
 
+def orient_for(file_path: str):
+    """auto_orient for photos and image scans, which often arrive sideways; PDF pages are
+    taken as they are. The check costs ~3 s per page (Tesseract OSD), and PDF scans are
+    nearly always upright, so skipping it there makes scanned/handwritten uploads faster."""
+    return (lambda page: auto_orient(page)) if kind_of(file_path) is FileKind.IMAGE else (lambda page: page)
+
+
 def ocr_file(file_path: str, max_pages: int | None = None, first_page: int = 0) -> list[tuple[str, float]]:
     """Return (page_text, raw_conf) for each page of a PDF or image (or the first max_pages),
     starting at page index first_page."""
     # closing(): if OCR fails mid-document, release the PDF now, not at garbage
     # collection (Windows cannot delete a file that is still open).
     with closing(render_pages(file_path, settings.ocr_dpi, max_pages, first_page)) as pages:
-        return [ocr_image(auto_orient(img)) for img in pages]
+        orient = orient_for(file_path)
+        return [ocr_image(orient(img)) for img in pages]

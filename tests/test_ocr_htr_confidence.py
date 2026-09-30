@@ -370,3 +370,16 @@ def test_otsu_threshold_separates_ink_from_paper() -> None:
     gray = np.array([[20] * 10 + [240] * 90], dtype=np.uint8)
     t = htr_extractor._otsu_threshold(gray)
     assert 20 <= t < 240
+
+
+def test_only_photos_get_the_rotation_check(pdf_file, tmp_path, fake_ocr, monkeypatch) -> None:
+    """The rotation check costs ~3 s per page; PDF scans are taken as upright, photos are checked."""
+    checked = []
+    monkeypatch.setattr(ocr_extractor, "auto_orient", lambda page: checked.append(1) or page)
+    ocr_extractor.ocr_file(str(pdf_file(["", ""])))
+    assert checked == []
+
+    photo = tmp_path / "photo.png"
+    Image.new("RGB", (400, 300), "white").save(photo)
+    ocr_extractor.ocr_file(str(photo))
+    assert checked == [1]
