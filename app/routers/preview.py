@@ -83,6 +83,7 @@ VIEW_STYLE = """
   header { padding: 16px 24px; background: #fff; border-bottom: 1px solid #d5e3f1; }
   h1 { margin: 0; font-size: 22px; }
   header p { margin: 2px 0 0; color: #5a6b7d; font-size: 15px; }
+  .back { display: inline-block; margin-bottom: 6px; color: #3f7fbf; font-size: 15px; }
   main { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
   h2 { margin: 24px 0 8px; font-size: 16px; color: #5a6b7d; font-weight: normal; }
   img, pre { display: block; width: 100%; margin: 0; background: #fff; border: 1px solid #d5e3f1; border-radius: 6px; }
@@ -112,5 +113,6 @@ def view(doc_id: str, db: Session = Depends(get_db)) -> HTMLResponse:
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         f'<meta name="viewport" content="width=device-width, initial-scale=1"><title>{name}</title>'
         f"<style>{VIEW_STYLE}</style></head><body>"
-        f"<header><h1>{name}</h1><p>{count}</p></header><main>{pages}</main></body></html>"
+        f'<header><a class="back" href="/">&larr; Back</a><h1>{name}</h1>'
+        f"<p>{count}</p></header><main>{pages}</main></body></html>"
     )

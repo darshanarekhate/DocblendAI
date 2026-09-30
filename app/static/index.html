@@ -277,16 +277,16 @@ async function loadDocs() {
   if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
   for (const d of docs) {
     const name = nameFromPath(d);
-    const viewUrl = `/documents/${d.doc_id}/view`;   // icon, name and View all open the document in a new tab
+    const viewUrl = `/documents/${d.doc_id}/view`;   // icon, name and View all open the document (same tab)
     docNames[d.doc_id] = name;
     const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
     remove.addEventListener("click", () => deleteDoc(d, remove));
     list.append(el("li", {},
-      el("a", { class: "ftype", href: viewUrl, target: "_blank", rel: "noopener", tabindex: "-1", "aria-hidden": "true" }, typeTag(name)),
+      el("a", { class: "ftype", href: viewUrl, tabindex: "-1", "aria-hidden": "true" }, typeTag(name)),
       el("span", { class: "doc-info" },
-        el("a", { class: "doc-name", href: viewUrl, target: "_blank", rel: "noopener", title: `Open ${name}` }, name),
+        el("a", { class: "doc-name", href: viewUrl, title: `Open ${name}` }, name),
         el("span", { class: "doc-meta" }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)),
-      el("a", { class: "view", href: viewUrl, target: "_blank", rel: "noopener",
+      el("a", { class: "view", href: viewUrl,
                 "aria-label": `View ${name}` }, "View"),
       remove));
   }
