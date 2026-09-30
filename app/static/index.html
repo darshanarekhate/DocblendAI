@@ -77,7 +77,10 @@
   .ftype { flex: none; width: 42px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
            color: var(--accent); border: 1px solid var(--line); border-radius: 5px; padding: 3px 0; background: var(--field); }
   .doc-info { flex: 1; min-width: 0; }
-  .doc-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+  .doc-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: inherit; text-decoration: none; }
+  a.ftype { text-decoration: none; }
+  a.ftype:hover { border-color: var(--accent); background: var(--accent-soft); }
+  a.doc-name:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
   .doc-meta { display: block; font-size: 13px; color: var(--muted); }
   .remove { flex: none; background: none; border: 0; color: var(--faint); font-size: 13px; cursor: pointer;
             padding: 4px 6px; border-radius: 5px; text-decoration: underline; text-underline-offset: 2px; }
@@ -274,15 +277,16 @@ async function loadDocs() {
   if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
   for (const d of docs) {
     const name = nameFromPath(d);
+    const viewUrl = `/documents/${d.doc_id}/view`;   // icon, name and View all open the document in a new tab
     docNames[d.doc_id] = name;
     const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
     remove.addEventListener("click", () => deleteDoc(d, remove));
     list.append(el("li", {},
-      el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(name)),
+      el("a", { class: "ftype", href: viewUrl, target: "_blank", rel: "noopener", tabindex: "-1", "aria-hidden": "true" }, typeTag(name)),
       el("span", { class: "doc-info" },
-        el("span", { class: "doc-name", title: name }, name),
+        el("a", { class: "doc-name", href: viewUrl, target: "_blank", rel: "noopener", title: `Open ${name}` }, name),
         el("span", { class: "doc-meta" }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)),
-      el("a", { class: "view", href: `/documents/${d.doc_id}/view`, target: "_blank", rel: "noopener",
+      el("a", { class: "view", href: viewUrl, target: "_blank", rel: "noopener",
                 "aria-label": `View ${name}` }, "View"),
       remove));
   }
