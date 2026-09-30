@@ -82,6 +82,7 @@
   .remove { flex: none; background: none; border: 0; color: var(--faint); font-size: 13px; cursor: pointer;
             padding: 4px 6px; border-radius: 5px; text-decoration: underline; text-underline-offset: 2px; }
   .remove:hover { color: var(--error); }
+  .view { flex: none; color: var(--accent); font-size: 13px; padding: 4px 6px; text-underline-offset: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
 
   /* --- ask & answers --- */
@@ -281,6 +282,8 @@ async function loadDocs() {
       el("span", { class: "doc-info" },
         el("span", { class: "doc-name", title: name }, name),
         el("span", { class: "doc-meta" }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)),
+      el("a", { class: "view", href: `/documents/${d.doc_id}/view`, target: "_blank", rel: "noopener",
+                "aria-label": `View ${name}` }, "View"),
       remove));
   }
 }
