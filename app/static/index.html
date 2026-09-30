@@ -90,6 +90,16 @@
   .view { flex: none; color: var(--accent); font-size: 13px; padding: 4px 6px; text-underline-offset: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
 
+  /* --- document shown on the page, below the two panels --- */
+  .viewer { grid-column: 1 / -1; }
+  .viewer[hidden] { display: none; }
+  .viewer-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .viewer-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .viewer .close { background: none; border: 0; padding: 0; color: var(--accent); font-size: 15px; cursor: pointer; text-decoration: underline; }
+  .viewer .page-no { margin: 18px 0 6px; font-size: 14px; color: var(--muted); }
+  .viewer img, .viewer pre { display: block; width: 100%; margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
+  .viewer pre { padding: 16px 18px; white-space: pre-wrap; font: 16px/1.6 var(--serif); }
+
   /* --- ask & answers --- */
   .ask-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
   .ask-row .hint { margin: 0; }
@@ -194,6 +204,14 @@
       <p class="no-answers" id="no-answers">Your answers will appear here, newest first.</p>
     </div>
   </section>
+  <section class="panel viewer" id="viewer" aria-labelledby="viewer-title" hidden>
+    <div class="viewer-head">
+      <h2 id="viewer-title"></h2>
+      <button type="button" class="close" id="viewer-close">Close</button>
+    </div>
+    <p class="lead" id="viewer-meta"></p>
+    <div id="viewer-pages"></div>
+  </section>
 </main>
 
 <script>
@@ -259,10 +277,41 @@ function setStatus(id, text, kind = "") {
   s.textContent = text;
 }
 
+// --- view a document on this page ---
+async function showDoc(id) {
+  const info = await api(`/documents/${id}/preview`);
+  const box = document.getElementById("viewer-pages");
+  box.replaceChildren();
+  const count = info.kind === "text" ? info.text_pages.length : info.page_count;
+  for (let n = 1; n <= count; n++) {
+    box.append(el("p", { class: "page-no" }, `Page ${n}`));
+    box.append(info.kind === "text"
+      ? el("pre", {}, info.text_pages[n - 1] || "(This page has no text.)")
+      : el("img", { src: `/documents/${id}/pages/${n}`, alt: `${docLabel(id)}, page ${n}`, loading: "lazy" }));
+  }
+  document.getElementById("viewer-title").textContent = docLabel(id);
+  document.getElementById("viewer-meta").textContent = pages(count);
+  const viewer = document.getElementById("viewer");
+  viewer.dataset.docId = id;
+  viewer.hidden = false;
+  viewer.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function hideDoc() {
+  const viewer = document.getElementById("viewer");
+  viewer.hidden = true;
+  delete viewer.dataset.docId;
+  document.getElementById("viewer-pages").replaceChildren();
+}
+document.getElementById("viewer-close").addEventListener("click", () => {
+  hideDoc();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
 async function deleteDoc(d, button) {
   button.disabled = true;
   try {
     await api(`/documents/${d.doc_id}`, { method: "DELETE" });
+    if (document.getElementById("viewer").dataset.docId === d.doc_id) hideDoc();
     setStatus("upload-status", `Removed ${docLabel(d.doc_id)}.`);
     await loadDocs();
   } catch (err) {
@@ -279,7 +328,7 @@ async function loadDocs() {
   if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
   for (const d of docs) {
     const name = nameFromPath(d);
-    const viewUrl = `/documents/${d.doc_id}/view`;   // icon, name and View all open the document (same tab)
+    const viewUrl = `/documents/${d.doc_id}/view`;   // kept as a link target; clicks show the document on this page
     docNames[d.doc_id] = name;
     const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
     remove.addEventListener("click", (e) => { e.stopPropagation(); deleteDoc(d, remove); });
@@ -292,7 +341,12 @@ async function loadDocs() {
                 "aria-label": `View ${name}` }, "View"),
       remove);
     // Clicking anywhere on the row opens the document (links inside already do; Remove stops the click).
-    row.addEventListener("click", (e) => { if (!e.target.closest("a, button")) location.href = viewUrl; });
+    // Clicking the row, icon, name or View shows the document on this page (Remove only removes).
+    row.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      e.preventDefault();
+      showDoc(d.doc_id).catch((err) => setStatus("upload-status", err.message, "error"));
+    });
     list.append(row);
   }
 }
