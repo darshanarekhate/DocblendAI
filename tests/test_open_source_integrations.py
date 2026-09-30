@@ -300,3 +300,65 @@ def test_noise_levels_give_increasing_error_rates() -> None:
     assert rates == sorted(rates)
     assert 0.02 <= rates[0] <= 0.1
     assert 0.18 <= rates[2] <= 0.4
+
+
+# --- Real notebook scans: show-through, merged lines, neighbouring fragments -----------------
+
+
+def _page_with(ink_fill: int, ghost_fill: int | None = None) -> Image.Image:
+    """White page, dark 'writing' blocks, and optionally faint 'show-through' blocks."""
+    page = Image.new("L", (600, 400), 250)
+    draw = ImageDraw.Draw(page)
+    for x in range(40, 560, 60):
+        draw.rectangle((x, 60, x + 40, 90), fill=ink_fill)
+        draw.rectangle((x, 160, x + 40, 190), fill=ink_fill)
+    if ghost_fill is not None:
+        for x in range(40, 560, 60):
+            draw.rectangle((x, 260, x + 40, 290), fill=ghost_fill)
+    return page
+
+
+def test_whiten_background_removes_show_through_and_keeps_ink() -> None:
+    out = np.asarray(line_segmentation.whiten_background(_page_with(ink_fill=20, ghost_fill=110)))
+    assert out[75, 60] == 20  # writing kept as it was
+    assert out[275, 60] == 255  # faint mirrored text from the back of the sheet: gone
+
+
+def test_whiten_background_keeps_pale_pencil() -> None:
+    """The cutoff follows the page's own ink, so faint writing is not mistaken for show-through."""
+    out = np.asarray(line_segmentation.whiten_background(_page_with(ink_fill=160)))
+    assert out[75, 60] == 160
+
+
+def test_whiten_background_blank_page() -> None:
+    assert np.asarray(line_segmentation.whiten_background(Image.new("L", (50, 50), 255))).min() == 255
+
+
+def test_group_words_does_not_chain_lines_through_tall_words() -> None:
+    """A tall word (descender, loop) must not stretch its line until it swallows the next lines."""
+    boxes = [
+        (100, 100, 200, 140), (220, 100, 320, 190),  # line 1; the second word hangs down to 190
+        (100, 170, 200, 210), (220, 170, 320, 210),  # line 2 overlaps that tall word only
+        (100, 240, 200, 280),  # line 3
+    ]
+    lines = line_segmentation.group_words(boxes)
+    assert len(lines) == 3
+    assert line_segmentation.group_into_lines(boxes)[0] == (100, 100, 320, 190)
+
+
+def test_detect_lines_keeps_only_the_lines_own_words(monkeypatch) -> None:
+    # Line 1 at y 100-140; line 2 starts at y 150, inside line 1's padded crop (pad 10).
+    words = np.array([[0.1, 0.10, 0.3, 0.14, 0.9], [0.1, 0.15, 0.3, 0.19, 0.9]])
+    monkeypatch.setattr(line_segmentation, "_detector", lambda: lambda pages: [{"words": words}])
+    page = Image.new("L", (1000, 1000), 255)
+    ImageDraw.Draw(page).rectangle((100, 150, 300, 190), fill=0)  # line 2's ink
+    first, second = line_segmentation.detect_lines(page)
+    assert np.asarray(first).min() == 255  # no fragment of line 2 in line 1's crop
+    assert np.asarray(second).min() == 0
+
+
+def test_find_lines_whitens_background(monkeypatch) -> None:
+    seen = []
+    monkeypatch.setattr(line_segmentation, "whiten_background", lambda page: seen.append(1) or page)
+    htr_extractor.find_lines(_ruled_page([3]))
+    assert seen == [1]

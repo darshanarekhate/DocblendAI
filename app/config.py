@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # Erase notebook rules and margin lines (OpenCV) before finding lines: ruled paper otherwise
     # looks like one full-width line of ink per rule.
     remove_ruled_lines: bool = True
+    # Whiten show-through from the back of the sheet and leftover rule traces before finding
+    # lines (see line_segmentation.whiten_background).
+    whiten_background: bool = True
     # Temperature scaling of TrOCR token probabilities (Ayllon et al., ICDAR 2024: raw HTR
     # confidence is overconfident). 1.0 = off; fit with `python -m evaluation.fit_htr_temperature`.
     htr_temperature: float = 1.0

@@ -42,6 +42,9 @@ SAME_LINE_OVERLAP = 0.5
 MAX_WORD_GAP = 4.0
 LINE_PAD = 0.25  # padding around each line crop, as a share of the line height
 MIN_WORD_SCORE = 0.3  # drop detections the model itself doubts (specks, paper texture)
+WORD_PAD = 0.15  # padding kept around each word inside a line crop, as a share of the word height
+# whiten_background: pixels lighter than ink_core + WHITEN_MIX * (otsu - ink_core) become paper.
+WHITEN_MIX = 0.5
 
 
 class LineDetectorUnavailableError(RuntimeError):
@@ -93,6 +96,28 @@ def remove_ruled_lines(page: Image.Image) -> Image.Image:
     return Image.fromarray(cleaned)
 
 
+def whiten_background(page: Image.Image) -> Image.Image:
+    """Turn everything clearly lighter than the page's own ink into white paper.
+
+    Thin notebook paper shows the writing on its back as faint grey mirrored text,
+    and rule removal leaves light traces; docTR detects both as extra "lines" and
+    TrOCR reads them as invented words. The cutoff sits halfway between the ink's
+    typical darkness (25th percentile of the pixels darker than Otsu's threshold)
+    and Otsu's threshold, so it adapts to the scan: ~85 for dark pen on a phone
+    scan, ~180 for pale pencil (whose strokes are kept).
+    """
+    import cv2
+
+    gray = np.asarray(page.convert("L"))
+    otsu, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    ink = gray[gray < otsu]
+    if ink.size == 0:
+        return page.convert("L")
+    core = float(np.percentile(ink, 25))
+    cutoff = core + WHITEN_MIX * (otsu - core)
+    return Image.fromarray(np.where(gray > cutoff, 255, gray).astype(np.uint8))
+
+
 @lru_cache
 def _detector():
     try:
@@ -108,7 +133,12 @@ Box = tuple[float, float, float, float]  # left, top, right, bottom in pixels
 
 
 def group_into_lines(boxes: list[Box]) -> list[Box]:
-    """Join word boxes into text-line boxes, top to bottom.
+    """Join word boxes into text-line boxes, top to bottom (see group_words)."""
+    return [_union(words) for words in group_words(boxes)]
+
+
+def group_words(boxes: list[Box]) -> list[list[Box]]:
+    """Group word boxes into text lines, top to bottom; each line is its words, left to right.
 
     A word joins the line it overlaps vertically the most (by at least
     SAME_LINE_OVERLAP of the shorter height); a gap wider than MAX_WORD_GAP
@@ -118,7 +148,10 @@ def group_into_lines(boxes: list[Box]) -> list[Box]:
     for box in sorted(boxes, key=lambda b: (b[1] + b[3]) / 2):
         best, best_overlap = None, SAME_LINE_OVERLAP
         for line in lines:
-            top, bottom = min(b[1] for b in line), max(b[3] for b in line)
+            # The line's typical band (median word top/bottom), not its full extent: with the
+            # extent, one tall word (a descender, a loop) stretches the line until it swallows
+            # the lines below, and TrOCR gets a crop of several lines, which it cannot read.
+            top, bottom = float(np.median([b[1] for b in line])), float(np.median([b[3] for b in line]))
             overlap = min(bottom, box[3]) - max(top, box[1])
             share = overlap / max(1e-6, min(bottom - top, box[3] - box[1]))
             if share >= best_overlap:
@@ -128,17 +161,17 @@ def group_into_lines(boxes: list[Box]) -> list[Box]:
         else:
             best.append(box)
 
-    out: list[Box] = []
+    out: list[list[Box]] = []
     for line in lines:
         words = sorted(line, key=lambda b: b[0])
         height = np.median([b[3] - b[1] for b in words])
         segment = [words[0]]
         for word in words[1:]:
             if word[0] - max(b[2] for b in segment) > MAX_WORD_GAP * height:
-                out.append(_union(segment))
+                out.append(segment)
                 segment = []
             segment.append(word)
-        out.append(_union(segment))
+        out.append(segment)
     return out  # lines were created top to bottom, and each line's segments left to right
 
 
@@ -157,10 +190,18 @@ def detect_lines(page: Image.Image) -> list[Image.Image]:
     boxes = [
         (x0 * w, y0 * h, x1 * w, y1 * h) for x0, y0, x1, y1, score in np.asarray(words).tolist() if score >= MIN_WORD_SCORE
     ]
+    gray = page.convert("L")
     crops = []
-    for left, top, right, bottom in group_into_lines(boxes):
+    for words_in_line in group_words(boxes):
+        left, top, right, bottom = _union(words_in_line)
         pad = LINE_PAD * (bottom - top)
-        crops.append(
-            page.crop((max(0, int(left - pad)), max(0, int(top - pad)), min(w, int(right + pad)), min(h, int(bottom + pad))))
-        )
+        box = (max(0, int(left - pad)), max(0, int(top - pad)), min(w, int(right + pad)), min(h, int(bottom + pad)))
+        # Keep only this line's own words; the padding would otherwise bring in the tops and
+        # bottoms of the lines above and below, and TrOCR reads those fragments as text.
+        crop = Image.new("L", (box[2] - box[0], box[3] - box[1]), 255)
+        for wl, wt, wr, wb in words_in_line:
+            wp = WORD_PAD * (wb - wt)
+            word = (max(box[0], int(wl - wp)), max(box[1], int(wt - wp)), min(box[2], int(wr + wp)), min(box[3], int(wb + wp)))
+            crop.paste(gray.crop(word), (word[0] - box[0], word[1] - box[1]))
+        crops.append(crop)
     return crops
