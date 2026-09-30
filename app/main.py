@@ -94,4 +94,5 @@ def health() -> dict[str, str]:
 @app.get("/", include_in_schema=False)
 def frontend() -> FileResponse:
     """Demo UI: upload documents, ask questions, see reliability labels and sources."""
-    return FileResponse(STATIC_DIR / "index.html")
+    # no-cache: browsers re-check the page on every visit, so UI changes show without Ctrl+F5.
+    return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
