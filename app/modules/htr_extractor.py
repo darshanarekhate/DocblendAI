@@ -102,25 +102,40 @@ def find_lines(page: Image.Image) -> list[Image.Image]:
     return segment_lines(page)
 
 
+def _matching_tokenizer(model_name: str, vocab_size: int, classes):
+    for cls in classes:
+        try:
+            tokenizer = cls.from_pretrained(model_name)
+        except (OSError, ValueError, TypeError):
+            continue
+        if len(tokenizer) >= vocab_size * 0.9:  # a mismatched class loads only a handful of tokens
+            return tokenizer
+    raise ValueError(f"no tokenizer class matches {model_name!r} (decoder vocabulary {vocab_size})")
+
+
 @lru_cache
 def _load(model_name: str):
     try:
         from transformers import (
             AutoImageProcessor,
             AutoTokenizer,
+            RobertaTokenizer,
             TrOCRProcessor,
             VisionEncoderDecoderModel,
             XLMRobertaTokenizer,
         )
 
+        model = VisionEncoderDecoderModel.from_pretrained(model_name)
         try:
             tokenizer = AutoTokenizer.from_pretrained(model_name)
         except ValueError:
-            # transformers 5 cannot auto-build trocr-small's legacy SentencePiece
-            # tokenizer config, but the named class loads it fine.
-            tokenizer = XLMRobertaTokenizer.from_pretrained(model_name)
+            # transformers 5 cannot auto-build the TrOCR checkpoints' legacy tokenizer configs,
+            # but the named classes load them: SentencePiece (XLM-R) for trocr-small, BPE
+            # (RoBERTa) for trocr-base/large. Pick the one whose vocabulary fits the decoder;
+            # the wrong one loads without error but decodes every line to "".
+            tokenizer = _matching_tokenizer(model_name, model.config.decoder.vocab_size,
+                                            (XLMRobertaTokenizer, RobertaTokenizer))
         processor = TrOCRProcessor(image_processor=AutoImageProcessor.from_pretrained(model_name), tokenizer=tokenizer)
-        model = VisionEncoderDecoderModel.from_pretrained(model_name)
     # OSError: not downloaded / no internet. ValueError, ImportError: a tokenizer dependency
     # (e.g. sentencepiece for trocr-small) is missing.
     except (OSError, ValueError, ImportError) as e:
@@ -195,5 +210,6 @@ def htr_file(file_path: str, max_pages: int | None = None, first_page: int = 0) 
     starting at page index first_page."""
     # closing(): release the PDF immediately if HTR fails (see ocr_extractor.ocr_file).
     with closing(render_pages(file_path, HTR_DPI, max_pages, first_page)) as pages:
-        # Orientation uses Tesseract OSD; it degrades to a no-op if Tesseract is missing.
-        return [htr_image(ocr_extractor.auto_orient(img)) for img in pages]
+        # Orientation (photos only) uses Tesseract OSD; it degrades to a no-op if Tesseract is missing.
+        orient = ocr_extractor.orient_for(file_path)
+        return [htr_image(orient(img)) for img in pages]
