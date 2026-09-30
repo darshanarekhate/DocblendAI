@@ -94,6 +94,8 @@ def find_lines(page: Image.Image) -> list[Image.Image]:
     """Crop a page into text-line images, top to bottom, with the configured segmenter."""
     if settings.remove_ruled_lines:
         page = line_segmentation.remove_ruled_lines(page)
+    if settings.whiten_background:
+        page = line_segmentation.whiten_background(page)
     if settings.htr_segmenter == "doctr":
         try:
             return line_segmentation.detect_lines(page)
