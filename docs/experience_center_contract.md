@@ -74,6 +74,8 @@ CLI: `venv/Scripts/python -m app.calibration.calibrate [DATASET] [--match exact|
 - Text OCR uses `rec_texts`/`rec_scores`/`rec_polys` (NOT `dt_polys`: it is not index-aligned with
   rec_texts once low-score lines are dropped) and `return_word_box=True` for word boxes.
 - PDFs rendered with PyMuPDF at `settings.paddle_pdf_dpi`, at most `settings.paddle_max_pages` pages.
+- `paddleocr_service.recognize_lines(image_path, lang="en") -> list[tuple[str, float]]`: text OCR of one
+  image, (line text, raw confidence) in reading order. Used by `python -m app.calibration.calibrate`.
 - Pipelines: `"ocr"` (PaddleOCR), `"structure"` (PPStructureV3), `"vl"` (PaddleOCRVL; only when
   `settings.paddle_enable_vl`, otherwise unavailable with a clear message), `"office"`
   (docx/xlsx/pptx -> Markdown via `paddleocr.doc2md_convert`, no OCR).
