@@ -98,6 +98,18 @@ CLI: `venv/Scripts/python -m app.calibration.calibrate [DATASET] [--match exact|
 
 Errors: `{"detail": "..."}` with 400 (bad form values), 404, 413 (too large), 415 (bad type), 503 (engine/pipeline unavailable).
 
+Details fixed by the implementation (additions, nothing above changed):
+- `wait=true` on a job that fails returns 200 with `status: "error"` and `error` set, except a pipeline
+  that cannot load (503). DELETE / PATCH on a run that is still running: 409.
+- Calibration jobs (`POST /api/calibrate`) are polled with `GET /api/results/{id}` too; they are not in the
+  history list and return `{id, status, progress, message, error, pipeline: "calibration", language,
+  filename, created_at, processing_time_ms, report}` (`report` = §1 report once done, else null).
+- `GET /api/calibration` returns the §1 report plus `"status": "calibrated"`.
+- PATCH: edited lines also get `needs_review: false` (a human checked them); `summary` is recomputed and,
+  for `pipeline: "ocr"`, the page and result `markdown` are rebuilt from the lines.
+- History `mean_confidence` = mean calibrated confidence (null for office runs). Runs left `queued`/`running`
+  by a server restart are reported as `status: "error"`.
+
 ## 4. Result object
 
 ```json

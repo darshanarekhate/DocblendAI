@@ -51,6 +51,54 @@ and the contents of `data/chroma_db/` (local dev data), restart, and re-upload.
 | GET | `/answer/{id}` | Fetch a stored answer |
 | GET | `/answer/{id}/sources` | Chunks behind an answer, with similarity, confidence, content type |
 
+## Experience Center API
+
+PaddleOCR text OCR, document parsing (PP-StructureV3) and Office-to-Markdown conversion with
+calibrated per-line confidence, used by the `/studio` page. Full shapes are in
+[docs/experience_center_contract.md](docs/experience_center_contract.md); code in
+`app/routers/paddleocr.py`, `app/modules/paddleocr_service.py` and `app/modules/ocr_jobs.py`.
+Jobs run one at a time on a background thread; results (history) are stored in the `ocr_runs`
+SQLite table and page images under `data/paddle_runs/`. Models load on first use (text OCR:
+a few seconds; PP-StructureV3: ~35 s, then about a minute per page on a CPU laptop).
+
+```bash
+# Engine, pipelines (ocr / structure / vl / office), calibration state, languages, limits
+curl http://127.0.0.1:8000/api/health
+
+# Text OCR of an image or PDF, waiting for the full result
+curl -F file=@scan.pdf -F language=en -F wait=true http://127.0.0.1:8000/api/ocr
+
+# Same, as a background job: returns 202 {"id": ..., "status": "queued"}; poll for progress
+curl -F file=@photo.jpg -F review_threshold=0.8 http://127.0.0.1:8000/api/ocr
+curl http://127.0.0.1:8000/api/results/<id>
+
+# Layout, tables and Markdown (PP-StructureV3); .docx/.xlsx/.pptx are converted without OCR
+curl -F file=@page.png -F pipeline=structure -F wait=true http://127.0.0.1:8000/api/parse
+curl -F file=@notes.docx -F wait=true http://127.0.0.1:8000/api/parse
+
+# History (newest first, search file names and recognised text), page image, delete
+curl "http://127.0.0.1:8000/api/results?q=calibration&limit=20"
+curl -o page0.png http://127.0.0.1:8000/api/results/<id>/pages/0/image
+curl -X DELETE http://127.0.0.1:8000/api/results/<id>
+
+# Human review: fix a line's text (the line is marked "edited": true)
+curl -X PATCH -H "Content-Type: application/json" \
+     -d '[{"page": 0, "line": 3, "text": "corrected text"}]' \
+     http://127.0.0.1:8000/api/results/<id>/lines
+
+# Fit confidence calibration on a zip (labels.csv with columns image,text + the images),
+# or on the bundled sample; then read the report and reliability diagram
+curl -F file=@dataset.zip -F match=cer http://127.0.0.1:8000/api/calibrate
+curl -F use_sample=true http://127.0.0.1:8000/api/calibrate
+curl http://127.0.0.1:8000/api/calibration
+curl -o diagram.png http://127.0.0.1:8000/api/calibration/diagram.png
+```
+
+Errors are `{"detail": "..."}`: 400 bad form value, 404 unknown id, 413 file larger than
+`PADDLE_MAX_UPLOAD_MB`, 415 unsupported or disguised file type, 503 pipeline unavailable
+(PaddleOCR-VL stays off unless `PADDLE_ENABLE_VL=true`). Tests never load a Paddle model
+(a guard in `tests/conftest.py` fails any test that tries).
+
 ## Testing and evaluation
 
 ```bash
