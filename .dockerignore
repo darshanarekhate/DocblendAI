@@ -1,0 +1,10 @@
+venv/
+paddle-venv/
+.git/
+.env
+**/__pycache__/
+*.pyc
+.pytest_cache/
+data/
+evaluation/dataset/
+evaluation/results/work/

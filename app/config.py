@@ -33,6 +33,35 @@ class Settings(BaseSettings):
     # Re-ranking pool: fetch top_k * this many by similarity, then re-sort by combined_score.
     candidate_multiplier: int = 3
 
+    # PaddleOCR Experience Center (/studio, /api/*). CPU-speed defaults: PP-OCRv5 mobile models,
+    # no orientation/unwarping, PDFs at ~150 DPI, every model loaded once and reused.
+    paddle_device: str = "cpu"  # "cpu" or "gpu" / "gpu:0"
+    paddle_ocr_version: str = "PP-OCRv5"
+    # Used for lang=en; other languages let PaddleOCR pick its own models for that language.
+    paddle_det_model: str = "PP-OCRv5_mobile_det"
+    paddle_rec_model: str = "en_PP-OCRv5_mobile_rec"
+    # Paddle 3.3 on Windows CPU crashes in its oneDNN kernels (ConvertPirAttribute2RuntimeAttribute
+    # "Unimplemented"), so MKL-DNN is off; the plain CPU kernels work.
+    paddle_enable_mkldnn: bool = False
+    paddle_use_orientation: bool = False
+    paddle_use_unwarping: bool = False
+    paddle_use_textline_orientation: bool = False
+    paddle_pdf_dpi: int = 150
+    paddle_max_pages: int = 30  # per uploaded PDF
+    paddle_max_upload_mb: int = 25
+    # PP-StructureV3 segfaults on 8 GB laptops when the -L formula model loads with the rest.
+    paddle_formula_model: str = "PP-FormulaNet_plus-S"
+    # PaddleOCR-VL (0.9B vision-language model): too heavy for CPU laptops, off = shown "unavailable".
+    paddle_enable_vl: bool = False
+    paddle_vl_version: str = "v1.6"
+    # Lines whose (calibrated) confidence is below this are flagged "needs review".
+    review_threshold: float = 0.70
+    # Calibration fitting: an OCR line counts as correct if its CER against ground truth is <= this.
+    calibration_cer_threshold: float = 0.1
+    paddle_runs_dir: Path = DATA_DIR / "paddle_runs"  # page images of each Experience Center run
+    paddle_calibration_dir: Path = DATA_DIR / "paddle_calibration"  # fitted calibrator + report + diagram
+    log_format: str = "text"  # "text" or "json" (structured logs)
+
     # OCR / HTR (build step 4)
     tesseract_cmd: str = ""  # path to tesseract.exe if it is not on PATH
     ocr_dpi: int = 300

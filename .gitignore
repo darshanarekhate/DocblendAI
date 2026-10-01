@@ -13,3 +13,9 @@ data/chroma_db/*
 # evaluation: regenerate with python -m evaluation.make_dataset / run_eval
 evaluation/dataset/
 evaluation/results/work/
+
+# second venv created during PaddleOCR setup (unused; venv/ is the project env)
+paddle-venv/
+# Experience Center runtime data
+data/paddle_runs/
+data/paddle_calibration/

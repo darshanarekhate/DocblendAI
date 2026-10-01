@@ -1,0 +1,23 @@
+# Alternative to the local venv: runs the whole pipeline in one container.
+#   docker compose up --build
+# Secrets come from .env (copy .env.example); data/ is bind-mounted so the SQLite DB,
+# ChromaDB and uploads are the same ones the local venv uses.
+services:
+  docblendai:
+    build: .
+    image: docblendai:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PADDLE_DEVICE: cpu
+    volumes:
+      - ./data:/app/data
+      - model-cache:/models
+    restart: unless-stopped
+
+volumes:
+  # PaddleOCR / TrOCR / docTR weights: downloaded once, kept across rebuilds.
+  model-cache:

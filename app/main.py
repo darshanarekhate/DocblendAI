@@ -14,15 +14,18 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db.database import init_db
-from app.routers import query, upload
+from app.routers import paddleocr, query, upload
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 # Uvicorn only configures its own loggers; this makes app.* INFO logs visible too.
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s"
+)
 
 
 @asynccontextmanager
@@ -42,6 +45,9 @@ app = FastAPI(
 
 app.include_router(upload.router)
 app.include_router(query.router)
+app.include_router(paddleocr.router)
+# Experience Center assets (studio.css/js, sample images) and the QA page's shared files.
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/health", tags=["system"])
@@ -53,3 +59,9 @@ def health() -> dict[str, str]:
 def frontend() -> FileResponse:
     """Demo UI: upload documents, ask questions, see reliability labels and sources."""
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/studio", include_in_schema=False)
+def studio() -> FileResponse:
+    """Experience Center: OCR / document parsing with calibrated confidence, side by side."""
+    return FileResponse(STATIC_DIR / "studio.html")

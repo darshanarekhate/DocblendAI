@@ -1,7 +1,14 @@
 python-dotenv
+paddlepaddle==3.3.1
+# doc-parser: PP-StructureV3 deps; doc2md: Office -> Markdown
+paddleocr[doc-parser,doc2md]==3.7.0
+paddlex==3.7.2
+PyMuPDF==1.28.2
+# paddlex pins 6.0.2 exactly; chromadb's kubernetes extra asks for >=6.0.3 (pip check warns, harmless)
+PyYAML==6.0.2
 google-genai
 torch
-transformers
+transformers==5.17.0
 pillow
 fastapi
 uvicorn
@@ -22,5 +29,8 @@ protobuf
 torchvision
 python-docx
 python-pptx
-opencv-python-headless
+# All three cv2 wheels share one folder: keep them on paddlex's pinned version so none overwrites the others.
+opencv-contrib-python==4.10.0.84
+opencv-python==4.10.0.84
+opencv-python-headless==4.10.0.84
 python-doctr
