@@ -83,9 +83,18 @@
                padding-top: 18px; border-top: 1px solid var(--line); }
   .docs-head h3 { margin: 0; font-size: 15px; }
   .docs-head .count { font-size: 13px; color: var(--muted); }
+  .docs-sub .pick { display: flex; align-items: baseline; gap: 4px; font-size: 13px; color: var(--faint); }
+  .docs-sub .pick button { background: none; border: 0; padding: 2px 4px; border-radius: 5px; cursor: pointer;
+                            color: var(--accent); font-size: 13px; }
+  .docs-sub .pick button:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .docs-sub[hidden] { display: none; }
+  .docs-sub { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
   ul.docs { list-style: none; margin: 0; padding: 0; }
   ul.docs li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
   ul.docs li:last-child { border-bottom: 0; }
+  ul.docs input[type="checkbox"] { flex: none; width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+  ul.docs li.off .doc-info, ul.docs li.off .ftype { opacity: 0.55; }
+  ul.docs label.doc-name { cursor: pointer; }
   .ftype { flex: none; width: 42px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
            color: var(--accent); border: 1px solid var(--line); border-radius: 5px; padding: 3px 0; background: var(--field); }
   .doc-info { flex: 1; min-width: 0; }
@@ -94,6 +103,8 @@
   .remove { flex: none; background: none; border: 0; color: var(--faint); font-size: 13px; cursor: pointer;
             padding: 4px 6px; border-radius: 5px; text-decoration: underline; text-underline-offset: 2px; }
   .remove:hover { color: var(--error); }
+  .remove.view { color: var(--accent); }
+  .remove.view:hover { color: var(--accent-hover); }
   .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
 
   /* --- ask & answers --- */
@@ -126,6 +137,32 @@
   .answer summary { cursor: pointer; color: var(--accent); font-size: 14px; }
   .source { margin-top: 12px; }
   .source .where { font-size: 14px; font-weight: 600; }
+  .source .where button { background: none; border: 0; padding: 0; font-weight: 600; font-size: 14px; cursor: pointer;
+                          color: var(--accent); text-decoration: underline; text-underline-offset: 2px; text-align: left; }
+  .source .where button:hover { color: var(--accent-hover); }
+
+  /* --- "Did you mean" --- */
+  .did-you-mean { margin: 10px 0 0; padding: 9px 12px; border-radius: 7px; background: var(--accent-soft); font-size: 14px; }
+  .did-you-mean[hidden] { display: none; }
+  .did-you-mean button { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer;
+                         color: var(--accent); text-decoration: underline; text-underline-offset: 2px; text-align: left; }
+  .did-you-mean span { color: var(--muted); }
+
+  /* --- document viewer --- */
+  dialog.viewer { width: min(960px, calc(100vw - 32px)); height: min(88vh, 1000px); max-width: none; max-height: none;
+                  padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); }
+  dialog.viewer[open] { display: flex; flex-direction: column; }
+  dialog.viewer::backdrop { background: rgb(0 0 0 / 0.45); }
+  .viewer-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .viewer-head h2 { flex: 1; min-width: 0; margin: 0; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .viewer-head a { font-size: 14px; color: var(--accent); white-space: nowrap; }
+  .viewer-head button { flex: none; padding: 6px 14px; font-size: 14px; }
+  .viewer-body { flex: 1; min-height: 0; overflow: auto; background: var(--quote); }
+  .viewer-body iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
+  .viewer-body img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  .viewer-body pre { margin: 0; padding: 16px 18px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+  .viewer-body .viewer-msg { padding: 24px 20px; color: var(--muted); font-size: 15px; }
+  .viewer-body .viewer-msg a { color: var(--accent); font-weight: 600; }
   .source .scores { font-size: 13px; color: var(--muted); font-weight: 400; }
   .source blockquote { margin: 6px 0 0; padding: 10px 12px; background: var(--quote); border-radius: 7px;
                        font-size: 14px; line-height: 1.55; white-space: pre-wrap; max-height: 180px; overflow: auto; }
@@ -170,6 +207,12 @@
       <h3>Uploaded</h3>
       <span class="count" id="doc-count"></span>
     </div>
+    <div class="docs-sub" id="docs-sub" hidden>
+      <span id="doc-selected">Ticked documents are used for answers.</span>
+      <span class="pick" role="group" aria-label="Select documents">
+        <button type="button" id="pick-all">All</button>/<button type="button" id="pick-none">None</button>
+      </span>
+    </div>
     <ul class="docs" id="docs"></ul>
   </section>
 
@@ -184,6 +227,7 @@
         <button type="submit" class="btn" id="ask-btn">Ask</button>
       </div>
       <p class="status" id="ask-status" role="status"></p>
+      <p class="did-you-mean" id="did-you-mean" aria-live="polite" hidden></p>
     </form>
 
     <details class="legend">
@@ -201,6 +245,15 @@
     </div>
   </section>
 </main>
+
+<dialog class="viewer" id="viewer" aria-labelledby="viewer-title">
+  <div class="viewer-head">
+    <h2 id="viewer-title"></h2>
+    <a id="viewer-open" target="_blank" rel="noopener">Open in new tab</a>
+    <button type="button" class="btn" id="viewer-close">Close</button>
+  </div>
+  <div class="viewer-body" id="viewer-body"></div>
+</dialog>
 
 <script>
 const WHY = {
@@ -278,25 +331,101 @@ async function deleteDoc(d, button) {
   }
 }
 
+// --- document selection: answers use only ticked documents ---
+// Unticked ids are remembered (not ticked ones), so a newly uploaded document starts ticked.
+const EXCLUDED_KEY = "docblendai.excludedDocs";
+let currentDocs = [];
+let excluded = new Set();
+try { excluded = new Set(JSON.parse(localStorage.getItem(EXCLUDED_KEY) || "[]")); } catch { /* storage unavailable */ }
+function saveExcluded() {
+  try { localStorage.setItem(EXCLUDED_KEY, JSON.stringify([...excluded])); } catch { /* storage unavailable */ }
+}
+function selectedDocIds() { return currentDocs.map((d) => d.doc_id).filter((id) => !excluded.has(id)); }
+function showSelection() {
+  const n = selectedDocIds().length, total = currentDocs.length;
+  document.getElementById("docs-sub").hidden = !total;
+  document.getElementById("doc-selected").textContent =
+    n === total ? "All documents are used for answers." : n ? `${n} of ${total} used for answers.` : "None selected: tick at least one.";
+  for (const li of document.querySelectorAll("#docs li[data-id]")) li.classList.toggle("off", excluded.has(li.dataset.id));
+}
+function setAll(on) {
+  for (const d of currentDocs) on ? excluded.delete(d.doc_id) : excluded.add(d.doc_id);
+  for (const box of document.querySelectorAll("#docs input[type=checkbox]")) box.checked = on;
+  saveExcluded(); showSelection();
+}
+document.getElementById("pick-all").addEventListener("click", () => setAll(true));
+document.getElementById("pick-none").addEventListener("click", () => setAll(false));
+
 async function loadDocs() {
   const list = document.getElementById("docs");
   const docs = await api("/documents");
+  currentDocs = docs;
+  // Forget removed documents so the stored selection does not grow forever.
+  excluded = new Set([...excluded].filter((id) => docs.some((d) => d.doc_id === id)));
+  saveExcluded();
   list.replaceChildren();
   document.getElementById("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
+  showSelection();
   if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
   for (const d of docs) {
     const name = nameFromPath(d);
     docNames[d.doc_id] = name;
+    const boxId = `use-${d.doc_id}`;
+    const box = el("input", { type: "checkbox", id: boxId, "aria-describedby": `meta-${d.doc_id}` });
+    box.checked = !excluded.has(d.doc_id);
+    box.addEventListener("change", () => {
+      box.checked ? excluded.delete(d.doc_id) : excluded.add(d.doc_id);
+      saveExcluded(); showSelection();
+    });
+    const view = el("button", { class: "remove view", type: "button", "aria-label": `View ${name}` }, "View");
+    view.addEventListener("click", () => openViewer(d.doc_id));
     const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
     remove.addEventListener("click", () => deleteDoc(d, remove));
-    list.append(el("li", {},
+    list.append(el("li", { "data-id": d.doc_id },
+      box,
       el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(name)),
       el("span", { class: "doc-info" },
-        el("span", { class: "doc-name", title: name }, name),
-        el("span", { class: "doc-meta" }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)),
-      remove));
+        el("label", { class: "doc-name", for: boxId, title: name }, name),
+        el("span", { class: "doc-meta", id: `meta-${d.doc_id}` }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)),
+      view, remove));
   }
+  showSelection();
 }
+
+// --- document viewer ---
+const viewer = document.getElementById("viewer"), viewerBody = document.getElementById("viewer-body");
+const IMAGE_EXTS = ["jpg", "jpeg", "png", "tif", "tiff", "bmp", "webp"];
+function downloadNote(text, url, name) {
+  return el("p", { class: "viewer-msg" }, text, " ", el("a", { href: url, download: name }, `Download ${name}`));
+}
+function openViewer(docId, page) {
+  const name = docLabel(docId), ext = name.split(".").pop().toLowerCase();
+  const url = `/documents/${encodeURIComponent(docId)}/file`;
+  document.getElementById("viewer-title").textContent = page ? `${name}, page ${page}` : name;
+  document.getElementById("viewer-open").href = ext === "pdf" && page ? `${url}#page=${page}` : url;
+  viewerBody.replaceChildren();
+  if (ext === "pdf") {
+    // A new iframe each time, so a different #page is honoured even for the same file.
+    viewerBody.append(el("iframe", { src: page ? `${url}#page=${page}` : url, title: name }));
+  } else if (IMAGE_EXTS.includes(ext)) {
+    const img = el("img", { src: url, alt: name });
+    img.addEventListener("error", () => img.replaceWith(downloadNote("This browser cannot show this image type.", url, name)));
+    viewerBody.append(img);
+  } else if (ext === "txt") {
+    const pre = el("pre", {}, "Loading…");
+    viewerBody.append(pre);
+    fetch(url).then((r) => { if (!r.ok) throw new Error(); return r.text(); })
+      .then((t) => { pre.textContent = t; })
+      .catch(() => { pre.textContent = "Could not load this file."; });
+  } else {
+    viewerBody.append(downloadNote("Word and PowerPoint files cannot be shown in the browser.", url, name));
+  }
+  if (!viewer.open) viewer.showModal();
+}
+document.getElementById("viewer-close").addEventListener("click", () => viewer.close());
+viewer.addEventListener("click", (e) => { if (e.target === viewer) viewer.close(); });  // click on the backdrop
+// The close event fires asynchronously: do not wipe a document reopened in the meantime.
+viewer.addEventListener("close", () => { if (!viewer.open) viewerBody.replaceChildren(); });
 
 // --- upload: click or drag a file onto the drop zone ---
 const fileInput = document.getElementById("file"), drop = document.getElementById("drop");
@@ -351,8 +480,10 @@ document.getElementById("upload-form").addEventListener("submit", async (e) => {
 function sourceView(s) {
   const where = [docLabel(s.doc_id), s.page ? `page ${s.page}` : null].filter(Boolean).join(", ");
   const pct = (v) => `${Math.round(v * 100)}%`;
+  const open = el("button", { type: "button", title: "Open the document here" }, where);
+  open.addEventListener("click", () => openViewer(s.doc_id, s.page));
   return el("div", { class: "source" },
-    el("div", { class: "where" }, where, " ",
+    el("div", { class: "where" }, open, " ",
       el("span", { class: "scores" }, `· match ${pct(s.similarity)} · readability ${pct(s.confidence)}`)),
     el("blockquote", {}, s.text));
 }
@@ -362,17 +493,46 @@ question.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); document.getElementById("ask-form").requestSubmit(); }
 });
 
+// "Did you mean": checked alongside the answer (never delays it); clicking asks the corrected question.
+const didYouMean = document.getElementById("did-you-mean");
+let suggestionRun = 0;
+async function checkSpelling(text, docIds) {
+  const run = ++suggestionRun;
+  try {
+    const s = await api("/ask/suggest", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question_text: text, doc_ids: docIds }),
+    });
+    if (run !== suggestionRun || !s.suggestion) return;
+    const ask = el("button", { type: "button" }, s.suggestion);
+    ask.addEventListener("click", () => {
+      question.value = s.suggestion;
+      document.getElementById("ask-form").requestSubmit();
+    });
+    didYouMean.replaceChildren("Did you mean: ", ask, "? ", el("span", {}, "Click to ask that instead."));
+    didYouMean.hidden = false;
+  } catch { /* a suggestion is optional; the question is answered anyway */ }
+}
+
 document.getElementById("ask-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = question.value.trim();
   if (!text) return;
+  didYouMean.hidden = true; suggestionRun++;
+  const docIds = selectedDocIds();
+  if (currentDocs.length && !docIds.length) {
+    setStatus("ask-status", "No documents are selected. Tick at least one document on the left (or press All).", "error");
+    return;
+  }
   const btn = document.getElementById("ask-btn");
   btn.disabled = true; btn.textContent = "Thinking…";
   setStatus("ask-status", "");
+  const filter = currentDocs.length ? docIds : null;
+  checkSpelling(text, filter);
   try {
     const answer = await api("/ask", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query_id: crypto.randomUUID(), question_text: text, user_id: "web" }),
+      body: JSON.stringify({ query_id: crypto.randomUUID(), question_text: text, user_id: "web", doc_ids: filter }),
     });
     const sources = await api(`/answer/${answer.answer_id}/sources`);
     const label = answer.reliability_label;

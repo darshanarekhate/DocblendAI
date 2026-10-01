@@ -4,19 +4,21 @@ Responsibility: accept an upload (PDF, image, Word, PowerPoint, or text; see
 file_types.py), save it under settings.upload_dir, run it through
 detection -> extraction (parse/OCR/HTR) -> chunking ->
 calibration -> content-type labeling -> embedding -> ChromaDB, and record a
-Document row.
+Document row. Also lists, serves (for the document viewer), and deletes documents.
 
 Uses from schemas.py: Document, FormatType.
 """
 
 import hashlib
 import logging
+import mimetypes
 import re
 import shutil
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi.responses import FileResponse
 from pdfplumber.utils.exceptions import PdfminerException
 from sqlalchemy.orm import Session
 
@@ -33,6 +35,7 @@ from app.modules import (
     format_detection,
     htr_extractor,
     ocr_extractor,
+    spelling,
     vector_store,
 )
 
@@ -104,11 +107,46 @@ def delete_document(doc_id: str, db: Session = Depends(get_db)) -> None:
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
     vector_store.delete_document(doc_id)
+    spelling.invalidate()
     file_path = Path(row.file_path)
     db.delete(row)
     db.commit()
     file_path.unlink(missing_ok=True)
     logger.info("Deleted %s (%s)", doc_id, file_path.name)
+
+
+# Types mimetypes may not know on every system (Windows reads them from the registry).
+MEDIA_TYPES = {
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+}
+
+
+@router.get("/documents/{doc_id}/file", response_class=FileResponse)
+def get_document_file(doc_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """The original uploaded file, shown inline (for the document viewer)."""
+    row = db.get(DocumentORM, doc_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
+    path = Path(row.file_path).resolve()
+    # The path comes only from the Document row; still refuse anything outside the upload folder.
+    if not path.is_relative_to(settings.upload_dir.resolve()) or not path.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "The uploaded file is missing")
+    media_type = MEDIA_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    name = path.name[len(doc_id) + 1 :] if path.name.startswith(f"{doc_id}_") else path.name
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=name,
+        content_disposition_type="inline",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
 
 
 def _sha256(path: Path) -> str:
@@ -178,6 +216,7 @@ def _ingest(doc_id: str, path: Path, format_hint: FormatType | None, db: Session
         # Keep ChromaDB and SQLite consistent: no vectors without a Document row.
         vector_store.delete_document(doc_id)
         raise
+    spelling.invalidate()  # the "Did you mean" vocabulary now includes this document's words
 
     mean_conf = sum(c.calibrated_conf for c in chunks) / len(chunks)
     logger.info(
