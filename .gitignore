@@ -19,3 +19,4 @@ paddle-venv/
 # Experience Center runtime data
 data/paddle_runs/
 data/paddle_calibration/
+.claude/worktrees/
