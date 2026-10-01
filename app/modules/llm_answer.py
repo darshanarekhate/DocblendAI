@@ -63,8 +63,11 @@ def build_prompt(question: str, chunks: list[RecognizedChunk]) -> str:
     return f"Context passages:\n{context}\n\nQuestion: {question}"
 
 
-def _generate(prompt: str) -> str:
+def _generate(prompt: str, system_instruction: str = SYSTEM_INSTRUCTION) -> str:
     """Answer with settings.llm_model, or settings.llm_fallback_model if the first stays busy.
+
+    system_instruction defaults to the answering rules; spelling.py passes its own
+    to reuse the same models, retries, and fallback.
 
     Free-tier Gemini quotas are counted per model, so when the default model is
     out of quota (429) or overloaded (503) a second model can usually still answer.
@@ -78,7 +81,7 @@ def _generate(prompt: str) -> str:
         models.append(settings.llm_fallback_model)
     for i, model in enumerate(models):
         try:
-            return _generate_with(model, prompt)
+            return _generate_with(model, prompt, system_instruction)
         except errors.APIError as e:
             if e.code in RETRYABLE_CODES and i < len(models) - 1:
                 logger.warning("%s unavailable (%s); answering with %s instead", model, e.code, models[i + 1])
@@ -87,10 +90,10 @@ def _generate(prompt: str) -> str:
     raise AssertionError("unreachable")
 
 
-def _generate_with(model: str, prompt: str) -> str:
+def _generate_with(model: str, prompt: str, system_instruction: str = SYSTEM_INSTRUCTION) -> str:
     """One Gemini model, with short retries on overload/rate limits. Raises the last APIError."""
     config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_INSTRUCTION,
+        system_instruction=system_instruction,
         temperature=0.2,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )

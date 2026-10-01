@@ -44,7 +44,10 @@ and the contents of `data/chroma_db/` (local dev data), restart, and re-upload.
 |---|---|---|
 | POST | `/upload` | Upload a PDF, image, .docx, .pptx, or .txt (optional `format_hint`: typed / scanned / handwritten) |
 | GET | `/documents` | List uploaded documents |
-| POST | `/ask` | Ask a question → answer + reliability label |
+| GET | `/documents/{id}/file` | The original uploaded file, inline (document viewer) |
+| DELETE | `/documents/{id}` | Remove a document (chunks, record, and file) |
+| POST | `/ask` | Ask a question → answer + reliability label (optional `doc_ids`: only use these documents) |
+| POST | `/ask/suggest` | "Did you mean": spelling-corrected question from the selected documents' words (`question_text`, optional `doc_ids`) |
 | GET | `/answer/{id}` | Fetch a stored answer |
 | GET | `/answer/{id}/sources` | Chunks behind an answer, with similarity, confidence, content type |
 
@@ -70,8 +73,8 @@ app/
 ├── config.py                Settings from .env (pydantic-settings)
 ├── static/index.html        Demo UI
 ├── routers/
-│   ├── upload.py            Module 1: POST /upload, GET /documents
-│   └── query.py             POST /ask, GET /answer/{id}[/sources] (Modules 5-7)
+│   ├── upload.py            Module 1: POST /upload, GET/DELETE /documents, GET /documents/{id}/file
+│   └── query.py             POST /ask, POST /ask/suggest, GET /answer/{id}[/sources] (Modules 5-7)
 ├── modules/
 │   ├── format_detection.py  Module 2: detect format, route to an extractor
 │   ├── text_parser.py       Module 2: direct parsing of typed PDFs
@@ -85,6 +88,7 @@ app/
 │   ├── embedder.py          Module 5: Gemini embeddings
 │   ├── vector_store.py      Module 5: ChromaDB wrapper
 │   ├── retrieval.py         Module 5: combined_score ranking
+│   ├── spelling.py          Module 5: "Did you mean" question spelling correction
 │   ├── reliability.py       Module 6: four-tier reliability labels
 │   └── llm_answer.py        Module 7: Gemini answer generation
 ├── db/

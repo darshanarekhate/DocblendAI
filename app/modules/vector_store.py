@@ -59,11 +59,22 @@ def add_chunks(doc_id: str, chunks: list[RecognizedChunk], pages: dict[str, int]
     )
 
 
-def search(query_vector: list[float], top_k: int = 5) -> list[tuple[RecognizedChunk, float]]:
-    """Return the top_k nearest chunks with cosine similarity (1 = identical), best first."""
+def _where(doc_ids: list[str] | None) -> dict | None:
+    """Chroma metadata filter limiting a lookup to some documents; None/empty = all documents."""
+    return {"doc_id": {"$in": list(doc_ids)}} if doc_ids else None
+
+
+def search(
+    query_vector: list[float], top_k: int = 5, doc_ids: list[str] | None = None
+) -> list[tuple[RecognizedChunk, float]]:
+    """Return the top_k nearest chunks with cosine similarity (1 = identical), best first.
+
+    doc_ids limits the search to those documents (None or empty = all documents).
+    """
     res = _get().query(
         query_embeddings=[query_vector],
         n_results=top_k,
+        where=_where(doc_ids),
         include=["documents", "metadatas", "distances", "embeddings"],
     )
     results = []
@@ -105,6 +116,11 @@ def get_pages(chunk_ids: list[str]) -> dict[str, int]:
         return {}
     res = _get().get(ids=chunk_ids, include=["metadatas"])
     return {cid: int(meta["page"]) for cid, meta in zip(res["ids"], res["metadatas"]) if "page" in meta}
+
+
+def get_texts(doc_ids: list[str] | None = None) -> list[str]:
+    """Text of every stored chunk of the given documents (None or empty = all documents)."""
+    return _get().get(where=_where(doc_ids), include=["documents"])["documents"]
 
 
 def delete_document(doc_id: str) -> None:
