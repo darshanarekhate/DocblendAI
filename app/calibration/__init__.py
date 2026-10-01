@@ -1,39 +1,30 @@
 """Supports Module 3 — confidence calibration for the PaddleOCR Experience Center.
 
-STUB: identity behaviour with the final signatures (see docs/experience_center_contract.md §1),
-so the service/API can be built in parallel. Replaced by the real calibrators.
+Maps PaddleOCR's raw line confidence to the probability that the line was
+read correctly, using a calibrator fitted on labelled sample images
+(`python -m app.calibration.calibrate`). Interface: docs/experience_center_contract.md §1.
+
+- calibrators.py  TemperatureScaler, PlattScaler, IsotonicCalibrator (pure numpy)
+- metrics.py      ECE, MCE, Brier, NLL, reliability bins
+- selection.py    fit_and_select: pick the method with the lowest validation ECE
+- labeling.py     OCR line vs ground truth -> correct / incorrect
+- active.py       the saved calibrator applied to new results
+- calibrate.py    run_calibration + CLI; diagram.py draws the reliability diagram
+- make_sample.py  generates the bundled sample dataset (evaluation/calibration_sample/)
 """
 
-from typing import Any
+from app.calibration.active import active_method, calibrate_confidences, clear_active_cache, load_active
+from app.calibration.calibrators import Calibrator, IsotonicCalibrator, PlattScaler, TemperatureScaler
+from app.calibration.selection import fit_and_select
 
-
-class Calibrator:
-    method = "identity"
-
-    def fit(self, confidences, labels) -> "Calibrator":
-        return self
-
-    def predict(self, confidences):
-        import numpy as np
-
-        return np.asarray(confidences, dtype=float)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"method": self.method}
-
-    @staticmethod
-    def from_dict(data: dict[str, Any]) -> "Calibrator":
-        return Calibrator()
-
-
-def load_active() -> Calibrator | None:
-    return None
-
-
-def clear_active_cache() -> None:
-    return None
-
-
-def calibrate_confidences(confidences: list[float]) -> tuple[list[float], str]:
-    """(calibrated confidences, "calibrated" | "uncalibrated")."""
-    return [float(c) for c in confidences], "uncalibrated"
+__all__ = [
+    "Calibrator",
+    "TemperatureScaler",
+    "PlattScaler",
+    "IsotonicCalibrator",
+    "fit_and_select",
+    "load_active",
+    "clear_active_cache",
+    "calibrate_confidences",
+    "active_method",
+]
