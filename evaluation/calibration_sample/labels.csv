@@ -1,0 +1,119 @@
+image,text
+sample_001.png,"The kernel function is sensitive to the learning rate.
+The language model outperforms the noisy labels."
+sample_002.png,"See Section 8.8 for the proof.
+The OCR engine estimates the time complexity."
+sample_003.png,"The dataset has 38,680 labelled pages.
+Figure 6 plots ECE against bin count.
+Stochastic sampling minimizes the matrix rank."
+sample_004.png,"The kernel function is sensitive to the learning rate.
+Stochastic sampling requires the cache misses.
+Dynamic programming improves the character accuracy."
+sample_005.png,"The query encoder approximates the eigenvalues.
+The dataset has 40,140 labelled pages.
+A balanced binary tree estimates the eigenvalues.
+Experiment 8 used a batch size of 16."
+sample_006.png,"A balanced binary tree improves the recall at 10.
+The OCR engine improves the eigenvalues.
+Stochastic sampling depends on the character accuracy."
+sample_007.png,"Table 9 reports an F1 score of 0.44.
+Batch normalization requires the cache misses.
+A balanced binary tree outperforms the cache misses."
+sample_008.png,"Batch normalization is bounded by the noisy labels.
+The attention mechanism minimizes the eigenvalues.
+Our baseline model approximates a local minimum."
+sample_009.png,"The training loss requires the prior distribution.
+A balanced binary tree requires the word error rate.
+Lemma 7 holds for all n > 6.
+The retrieval module minimizes the time complexity."
+sample_010.png,"The sorting algorithm requires the validation error.
+Lemma 9 holds for all n > 3."
+sample_011.png,"The proposed method requires the matrix rank.
+Stochastic sampling is bounded by the character accuracy.
+Experiment 8 used a batch size of 16."
+sample_012.png,"A hash table lookup reduces the input sequence.
+The OCR engine minimizes the eigenvalues.
+The dataset has 20,820 labelled pages."
+sample_013.png,"A hash table lookup improves the expected cost.
+A hash table lookup is sensitive to the learning rate."
+sample_014.png,"The dataset has 18,110 labelled pages.
+Each convolution layer improves the search space.
+See Section 2.9 for the proof."
+sample_015.png,"The language model requires the noisy labels.
+Our baseline model is sensitive to the input sequence.
+The proposed method approximates each memory access."
+sample_016.png,"Runtime is O(n log n) for n = 2300.
+Our baseline model depends on the learning rate."
+sample_017.png,"The attention mechanism estimates the noisy labels.
+Dynamic programming approximates the search space."
+sample_018.png,"The attention mechanism converges to the validation error.
+Experiment 7 used a batch size of 16.
+The database index reduces the recall at 10.
+The kernel function preserves the prior distribution."
+sample_019.png,"The attention mechanism preserves the time complexity.
+The OCR engine converges to the recall at 10.
+The sorting algorithm estimates the input sequence."
+sample_020.png,"The attention mechanism requires the validation error.
+The kernel function preserves the noisy labels.
+A hash table lookup improves each memory access."
+sample_021.png,"Batch normalization is bounded by the expected cost.
+The query encoder minimizes the word error rate.
+Our baseline model improves the cache misses."
+sample_022.png,"The dataset has 10,790 labelled pages.
+Table 8 reports an F1 score of 0.64.
+The gradient descent update depends on the prior distribution."
+sample_023.png,"The retrieval module estimates each memory access.
+Accuracy rose from 26% to 70% in 33 epochs."
+sample_024.png,"A balanced binary tree improves the search space.
+The confidence score outperforms the input sequence.
+See Section 8.5 for the proof."
+sample_025.png,"The sorting algorithm requires the search space.
+The OCR engine estimates the noisy labels.
+Batch normalization approximates the eigenvalues.
+Accuracy rose from 44% to 57% in 22 epochs."
+sample_026.png,"Experiment 7 used a batch size of 128.
+A balanced binary tree is sensitive to the eigenvalues."
+sample_027.png,"The dataset has 32,520 labelled pages.
+Each convolution layer converges to the learning rate.
+The proposed method estimates the validation error."
+sample_028.png,"The gradient descent update improves the cache misses.
+Dynamic programming requires the eigenvalues.
+A hash table lookup preserves each memory access."
+sample_029.png,"Each convolution layer depends on the search space.
+A balanced binary tree is sensitive to the prior distribution.
+Binary search outperforms the matrix rank."
+sample_030.png,"Figure 5 plots ECE against bin count.
+Batch normalization reduces the noisy labels.
+The kernel function is sensitive to each memory access."
+sample_031.png,"The retrieval module minimizes the word error rate.
+The kernel function minimizes the time complexity.
+The language model converges to the validation error."
+sample_032.png,"Figure 6 plots ECE against bin count.
+Accuracy rose from 26% to 92% in 4 epochs.
+A hash table lookup depends on the recall at 10.
+The OCR engine depends on the character accuracy."
+sample_033.png,"The gradient descent update is bounded by the search space.
+The database index improves the character accuracy.
+Stochastic sampling depends on the prior distribution.
+Table 8 reports an F1 score of 0.10."
+sample_034.png,"Accuracy rose from 38% to 63% in 25 epochs.
+Stochastic sampling preserves the noisy labels.
+The OCR engine preserves the eigenvalues.
+The confidence score minimizes the matrix rank."
+sample_035.png,"The language model preserves the word error rate.
+Lemma 7 holds for all n > 7.
+The proposed method is bounded by the input sequence."
+sample_036.png,"Accuracy rose from 38% to 79% in 26 epochs.
+The database index estimates the recall at 10.
+The retrieval module requires the character accuracy."
+sample_037.png,"Table 2 reports an F1 score of 0.77.
+Batch normalization requires the matrix rank.
+The attention mechanism estimates the cache misses."
+sample_038.png,"The retrieval module outperforms the learning rate.
+Binary search preserves the cache misses."
+sample_039.png,"The kernel function estimates the noisy labels.
+Lemma 3 holds for all n > 4.
+A balanced binary tree minimizes the validation error."
+sample_040.png,"Figure 5 plots ECE against bin count.
+Our baseline model outperforms the input sequence.
+Batch normalization improves the word error rate."
