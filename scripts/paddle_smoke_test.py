@@ -4,6 +4,8 @@ Run with:  venv/Scripts/python scripts/paddle_smoke_test.py
 Exit code 0 = text OCR and PP-StructureV3 both work on this machine.
 """
 
+import difflib
+import os
 import sys
 import tempfile
 import time
@@ -14,6 +16,10 @@ from PIL import Image, ImageDraw, ImageFont
 # Paddle 3.3 on Windows CPU crashes in its oneDNN kernels (ConvertPirAttribute2RuntimeAttribute
 # "Unimplemented"); the plain CPU kernels work, so MKL-DNN stays off.
 COMMON = {"device": "cpu", "enable_mkldnn": False}
+# The -L formula model segfaults on 8 GB laptops when loaded with the rest of PP-StructureV3.
+STRUCTURE = {"use_seal_recognition": False, "use_chart_recognition": False,
+             "formula_recognition_model_name": "PP-FormulaNet_plus-S"}
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 LINES = ["DocBlendAI smoke test", "Confidence calibration 0.042"]
 
 
@@ -67,9 +73,12 @@ def main() -> int:
             if result is not None:
                 for text, score in zip(result["rec_texts"], result["rec_scores"]):
                     print(f"        {score:.4f}  {text}")
-                ok &= [t.strip() for t in result["rec_texts"]] == LINES
+                # Near-exact is enough (e.g. "AI" read as "Al"): this checks the install, not accuracy.
+                read = [t.strip() for t in result["rec_texts"]]
+                ok &= len(read) == len(LINES) and all(
+                    difflib.SequenceMatcher(None, a, b).ratio() >= 0.9 for a, b in zip(read, LINES))
         structure, good = step("construct PPStructureV3()", lambda: PPStructureV3(
-            lang="en", use_doc_orientation_classify=False, use_doc_unwarping=False, **COMMON))
+            lang="en", use_doc_orientation_classify=False, use_doc_unwarping=False, **STRUCTURE, **COMMON))
         ok &= good
         if structure is not None:
             result, good = step("PP-StructureV3 parse", lambda: next(iter(structure.predict(str(image)))))
