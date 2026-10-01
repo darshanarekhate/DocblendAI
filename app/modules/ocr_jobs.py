@@ -146,7 +146,8 @@ class JobManager:
     # -- OCR / parse runs ----------------------------------------------------------------------
 
     def submit_run(
-        self, upload_path: Path, filename: str, pipeline: str, language: str, review_threshold: float
+        self, upload_path: Path, filename: str, pipeline: str, language: str, review_threshold: float,
+        preprocess: dict[str, bool] | None = None,
     ) -> Job:
         """Queue one document. Takes ownership of upload_path (deleted when the job ends)."""
         job = Job(
@@ -159,7 +160,7 @@ class JobManager:
                 created_at=job.created_at, full_text="", result_json=json.dumps(self._base(job)),
             ))
             db.commit()
-        return self._enqueue(job, lambda j: self._run_document(j, upload_path, review_threshold))
+        return self._enqueue(job, lambda j: self._run_document(j, upload_path, review_threshold, preprocess))
 
     def _base(self, job: Job) -> dict[str, Any]:
         return {
@@ -177,7 +178,9 @@ class JobManager:
                 row.status = status
                 db.commit()
 
-    def _run_document(self, job: Job, upload_path: Path, review_threshold: float) -> None:
+    def _run_document(
+        self, job: Job, upload_path: Path, review_threshold: float, preprocess: dict[str, bool] | None = None
+    ) -> None:
         if job.cancelled:  # deleted while queued
             upload_path.unlink(missing_ok=True)
             return
@@ -197,7 +200,7 @@ class JobManager:
         result: dict[str, Any] | None = None
         try:
             pages, note = svc.paddleocr_service.process(
-                upload_path, job.pipeline, job.language, pages_dir, _image_url(job.id), progress
+                upload_path, job.pipeline, job.language, pages_dir, _image_url(job.id), progress, preprocess
             )
             calibration = svc.apply_calibration(pages, review_threshold)
             job.processing_time_ms = round((time.perf_counter() - started) * 1000, 1)
@@ -206,6 +209,7 @@ class JobManager:
             result.update({
                 "calibration": calibration, "summary": svc.summarize(pages),
                 "markdown": svc.join_markdown(pages), "pages": pages,
+                "preprocess": sorted(k for k, v in (preprocess or {}).items() if v),
             })
         except svc.PaddleOCRUnavailableError as exc:
             job.unavailable = True

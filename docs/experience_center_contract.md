@@ -142,5 +142,16 @@ are null and only `markdown`/`tables` are filled. While `status != "done"`, `pag
 
 ## 5. Preprocessing options (`preprocess` JSON on /api/ocr and /api/parse)
 
-`{"deskew": bool, "denoise": bool, "contrast": bool, "binarize": bool}`, all default false
-(implemented in Step 5; until then the field is accepted and ignored).
+`{"deskew": bool, "denoise": bool, "contrast": bool, "binarize": bool}`, all default false.
+Applied in that order to every rendered page image before recognition (not to Office files);
+the stored page image is the cleaned one, so boxes line up with what the UI shows. Results list
+the applied steps in `"preprocess": ["deskew", ...]`.
+
+## 6. Step 5 endpoints (`app/routers/studio_tools.py`, prefix `/api`)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/results/{id}/export/{fmt}` | `fmt` = txt \| json \| md \| pdf (searchable: page image + invisible text layer) \| docx \| csv (one table; a .zip when several). Uses the reviewed (edited) text. 404 unknown id, 409 not finished, 400 bad format or nothing to export |
+| POST | `/api/preprocess` | multipart `file` (image or PDF; first page) + `preprocess` JSON -> `{"before": "data:image/png;base64,...", "after": "...", "steps": [...], "skew_angle": 1.8}` (previews at most 1400 px) |
+| GET | `/api/plugins` | `[{name, title, description, enabled, message}]` |
+| POST | `/api/results/{id}/plugins/{name}` | JSON options (`kie`: `{"fields": [...]}`; `translate`: `{"target_language": "French"}`) -> plugin output. 503 when the plugin is disabled (no API key), 400 bad options, 502 model error |

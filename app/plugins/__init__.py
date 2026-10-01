@@ -6,10 +6,10 @@ at GET /api/plugins and runs one at POST /api/results/{id}/plugins/{name}. Addin
 plugin = one module defining a Plugin subclass + one line in PLUGINS below.
 """
 
-from app.plugins.base import Plugin, PluginError
+from app.plugins.base import Plugin, PluginError, PluginModelError
 from app.plugins.kie import KeyInfoExtraction
 from app.plugins.translate import Translation
 
 PLUGINS: dict[str, Plugin] = {p.name: p for p in (KeyInfoExtraction(), Translation())}
 
-__all__ = ["PLUGINS", "Plugin", "PluginError"]
+__all__ = ["PLUGINS", "Plugin", "PluginError", "PluginModelError"]

@@ -71,7 +71,7 @@ def _review_threshold(value: str | None) -> float:
 
 
 def _preprocess(value: str | None) -> dict[str, bool]:
-    """Contract §5 options, validated with app.modules.preprocess (accepted, not applied yet)."""
+    """Contract §5 options, validated with app.modules.preprocess and applied to every page image."""
     if value is None or not value.strip():
         return preprocess_steps.parse_options(None)
     try:
@@ -149,7 +149,7 @@ async def _submit_document(
     suffix, kind = _upload_kind(file.filename)
     lang = _language(language)
     threshold = _review_threshold(review_threshold)
-    _preprocess(preprocess)
+    options = _preprocess(preprocess)
     if kind == "office":
         pipeline = "office"
     _require_available(pipeline)
@@ -162,7 +162,7 @@ async def _submit_document(
         except svc.UnreadableInputError as exc:
             raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, f"{file.filename}: {exc}") from exc
         filename = Path(file.filename or f"upload{suffix}").name[:255]
-        job = await run_in_threadpool(job_manager.submit_run, path, filename, pipeline, lang, threshold)
+        job = await run_in_threadpool(job_manager.submit_run, path, filename, pipeline, lang, threshold, options)
         submitted = True  # the job now owns (and deletes) the temp file
     finally:
         if not submitted:

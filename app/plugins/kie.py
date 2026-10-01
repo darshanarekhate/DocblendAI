@@ -6,7 +6,7 @@ invents are dropped, so the output stays as trustworthy as the OCR it came from.
 
 from typing import Any
 
-from app.plugins.base import MAX_INPUT_CHARS, Plugin, PluginError, gemini, parse_json
+from app.plugins.base import MAX_INPUT_CHARS, Plugin, PluginError, PluginModelError, gemini, parse_json
 
 DEFAULT_FIELDS = ["title", "author", "date", "course or subject", "institution", "key terms"]
 
@@ -45,6 +45,6 @@ class KeyInfoExtraction(Plugin):
         prompt = f"Fields: {', '.join(fields)}\n\nText:\n{text[:MAX_INPUT_CHARS]}"
         data = parse_json(gemini(prompt, SYSTEM, as_json=True))
         if not isinstance(data, dict):
-            raise PluginError("The model did not return a JSON object")
+            raise PluginModelError("The model did not return a JSON object")
         haystack = _normalise(text)
         return {"fields": {f: _grounded(data.get(f), haystack) for f in fields}}

@@ -11,7 +11,11 @@ MAX_INPUT_CHARS = 30_000
 
 
 class PluginError(RuntimeError):
-    """The plugin is disabled, got bad options, or its model call failed."""
+    """The plugin got bad options or empty input (the caller's fault)."""
+
+
+class PluginModelError(PluginError):
+    """The model call failed or returned something unusable (not the caller's fault)."""
 
 
 class Plugin:
@@ -59,9 +63,9 @@ def gemini(prompt: str, system: str, as_json: bool = False) -> str:
         except errors.APIError as e:
             if e.code in RETRYABLE_CODES and i < len(models) - 1:
                 continue
-            raise PluginError(f"Gemini call failed ({model}): {e}") from e
+            raise PluginModelError(f"Gemini call failed ({model}): {e}") from e
         if not resp.text:
-            raise PluginError("Gemini returned an empty response (possibly blocked)")
+            raise PluginModelError("Gemini returned an empty response (possibly blocked)")
         return resp.text.strip()
     raise AssertionError("unreachable")
 
@@ -72,4 +76,4 @@ def parse_json(text: str) -> Any:
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError as e:
-        raise PluginError(f"The model did not return valid JSON: {e}") from e
+        raise PluginModelError(f"The model did not return valid JSON: {e}") from e

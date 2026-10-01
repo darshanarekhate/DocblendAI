@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.modules import preprocess as preprocess_steps
 
 logger = logging.getLogger(__name__)
 
@@ -510,6 +511,20 @@ def render_pages(path: Path, kind: str, out_dir: Path) -> tuple[list[Path], int]
     raise UnreadableInputError(f"cannot render {kind!r} files to pages")
 
 
+def preprocess_page(page_path: Path, options: dict[str, bool]) -> None:
+    """Apply the enabled clean-up steps to one rendered page PNG, in place."""
+    import cv2
+    import numpy as np
+
+    image = cv2.imdecode(np.fromfile(str(page_path), dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise UnreadableInputError(f"could not read page image {page_path.name}")
+    ok, encoded = cv2.imencode(".png", preprocess_steps.apply(image, options))
+    if not ok:
+        raise UnreadableInputError(f"could not write page image {page_path.name}")
+    encoded.tofile(str(page_path))
+
+
 def _image_size(path: Path) -> tuple[int, int]:
     from PIL import Image
 
@@ -761,11 +776,13 @@ class PaddleOCRService:
     def process(
         self, path: Path, pipeline: str, lang: str, pages_dir: Path,
         image_url: Callable[[int], str] | None = None, progress: ProgressFn | None = None,
+        preprocess: dict[str, bool] | None = None,
     ) -> tuple[list[dict[str, Any]], str | None]:
         """Run one uploaded file through a pipeline -> (contract pages, note or None).
 
         Page images are written to pages_dir/page-<n>.png (kept: the UI draws boxes on them).
-        Confidence calibration is applied separately (`apply_calibration`).
+        Preprocessing (contract §5) rewrites those PNGs before recognition, so boxes and the
+        displayed page agree. Confidence calibration is applied separately (`apply_calibration`).
         """
         progress = progress or (lambda fraction, message: None)
         if pipeline == "office":
@@ -778,6 +795,10 @@ class PaddleOCRService:
         self.get_model(pipeline, lang, progress)  # load first, so its time is not "page 1"
         progress(0.0, "Preparing pages")
         page_paths, total = render_pages(path, kind, pages_dir)
+        if preprocess_steps.any_enabled(preprocess):
+            progress(0.0, "Cleaning up page images")
+            for page_path in page_paths:
+                preprocess_page(page_path, preprocess)
         note = None
         if total > len(page_paths):
             note = f"Only the first {len(page_paths)} of {total} pages were processed (PADDLE_MAX_PAGES)."

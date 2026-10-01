@@ -6,7 +6,6 @@ are wired together through the routers.
 Run with:  venv/Scripts/python -m uvicorn app.main:app --reload
 """
 
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -18,14 +17,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db.database import init_db
-from app.routers import paddleocr, query, upload
+from app.logging_config import configure_logging
+from app.routers import paddleocr, query, studio_tools, upload
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-# Uvicorn only configures its own loggers; this makes app.* INFO logs visible too.
-logging.basicConfig(
-    level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s"
-)
+# Uvicorn only configures its own loggers; this makes app.* INFO logs visible too
+# (LOG_FORMAT=json switches to one JSON object per line).
+configure_logging(settings.log_format)
 
 
 @asynccontextmanager
@@ -46,6 +45,7 @@ app = FastAPI(
 app.include_router(upload.router)
 app.include_router(query.router)
 app.include_router(paddleocr.router)
+app.include_router(studio_tools.router)
 # Experience Center assets (studio.css/js, sample images) and the QA page's shared files.
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
