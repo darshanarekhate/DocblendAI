@@ -242,3 +242,10 @@ def test_parse_json_tolerates_fences():
     assert plugin_base.parse_json('```json\n{"a": 1}\n```') == {"a": 1}
     with pytest.raises(PluginError):
         plugin_base.parse_json("not json")
+
+
+def test_deskew_ignores_speckle_and_grey_scan_borders():
+    # noisy_scan.png: speckled, low contrast, rotated 2.2 degrees clockwise with grey corners.
+    sample = cv2.imread(str(Path(__file__).parent.parent / "app" / "static" / "samples" / "noisy_scan.png"))
+    assert preprocess.skew_angle(sample) == pytest.approx(2.2, abs=0.3)
+    assert preprocess.skew_angle(preprocess.deskew(sample)) == 0.0

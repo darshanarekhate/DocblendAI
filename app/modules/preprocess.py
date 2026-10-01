@@ -51,20 +51,29 @@ def _gray(image: np.ndarray) -> np.ndarray:
 def skew_angle(image: np.ndarray) -> float:
     """Degrees to rotate (counter-clockwise) to level the text; 0.0 if no clear skew.
 
-    The minimum-area rectangle around all ink pixels tilts with the text block.
+    Projection-profile search: when text lines are level, the row sums of the ink
+    image alternate sharply between lines and gaps, so their variance peaks. Ink
+    comes from an adaptive threshold (flat paper, shadows and scanner borders are
+    not ink) followed by a median filter (speckle is not ink either).
     """
     gray = _gray(image)
-    _, ink = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    points = cv2.findNonZero(ink)
-    if points is None or len(points) < 50:
+    scale = min(1.0, 1000 / max(gray.shape))
+    if scale < 1.0:
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    ink = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 25, 15)
+    ink = cv2.medianBlur(ink, 3)
+    if cv2.countNonZero(ink) < 50:
         return 0.0
-    (_, _), (w, h), angle = cv2.minAreaRect(points)
-    # OpenCV >= 4.5 reports angles in (0, 90]; map to the smallest rotation that levels the box.
-    if w < h:
-        angle = angle - 90
-    if abs(angle) > MAX_SKEW_DEGREES or abs(angle) < 0.1:
-        return 0.0
-    return float(angle)
+    h, w = ink.shape
+    center = (w / 2, h / 2)
+
+    def sharpness(angle: float) -> float:
+        rotated = cv2.warpAffine(ink, cv2.getRotationMatrix2D(center, angle, 1.0), (w, h), flags=cv2.INTER_NEAREST)
+        return float(np.var(rotated.sum(axis=1, dtype=np.float64)))
+
+    coarse = max(np.arange(-MAX_SKEW_DEGREES, MAX_SKEW_DEGREES + 0.01, 0.5), key=sharpness)
+    best = max(np.arange(coarse - 0.5, coarse + 0.51, 0.1), key=sharpness)
+    return 0.0 if abs(best) < 0.2 else round(float(best), 2)
 
 
 def deskew(image: np.ndarray) -> np.ndarray:
