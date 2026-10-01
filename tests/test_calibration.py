@@ -86,7 +86,7 @@ def test_platt_recovers_known_slope_and_offset():
 
 
 def test_isotonic_pools_violators_and_is_monotone():
-    model = IsotonicCalibrator().fit([0.1, 0.2, 0.3, 0.4], [0, 1, 0, 1])
+    model = IsotonicCalibrator(prior=0).fit([0.1, 0.2, 0.3, 0.4], [0, 1, 0, 1])  # pure PAV
     assert model.predict([0.1, 0.2, 0.3, 0.4]).tolist() == pytest.approx([1e-6, 0.5, 0.5, 1 - 1e-6])
     conf, labels = overconfident(3000, seed=3)
     model = IsotonicCalibrator().fit(conf, labels)
@@ -96,8 +96,19 @@ def test_isotonic_pools_violators_and_is_monotone():
 
 
 def test_isotonic_merges_equal_confidences():
-    model = IsotonicCalibrator().fit([0.5, 0.5, 0.5, 0.9], [0, 1, 1, 1])
+    model = IsotonicCalibrator(prior=0).fit([0.5, 0.5, 0.5, 0.9], [0, 1, 1, 1])
     assert model.predict([0.5])[0] == pytest.approx(2 / 3)
+
+
+def test_isotonic_prior_keeps_small_blocks_off_zero_and_one():
+    # 12 misreads below 0.8, 30 correct reads above: pure PAV says exactly 0 and 1.
+    conf = [0.5 + 0.02 * i for i in range(12)] + [0.9 + 0.003 * i for i in range(30)]
+    labels = [0] * 12 + [1] * 30
+    model = IsotonicCalibrator().fit(conf, labels)
+    low, high = model.predict([0.55, 0.95])
+    assert low == pytest.approx(1 / 14) and high == pytest.approx(31 / 32)
+    restored = Calibrator.from_dict(model.to_dict())
+    assert restored.prior == 1.0 and restored.predict([0.55])[0] == pytest.approx(low)
 
 
 @pytest.mark.parametrize("cls", ALL)

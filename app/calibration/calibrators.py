@@ -207,13 +207,19 @@ class IsotonicCalibrator(Calibrator):
     pools neighbouring points while their accuracy does not increase. Each pooled
     block is kept as two knots (its lowest and highest confidence, same
     value), and predict() interpolates linearly between knots and holds the
-    end values outside them. Output is clipped to [EPS, 1 - EPS] so a step
-    of accuracy 0 or 1 never claims certainty.
+    end values outside them.
+
+    Each block's accuracy gets an add-`prior` (Laplace) correction,
+    (correct + prior) / (n + 2 * prior): with ~100 calibration lines a block of
+    a dozen misreads would otherwise map to exactly 0, claiming certainty the
+    data cannot support. A running maximum then restores monotonicity (the
+    correction pulls small blocks harder towards 0.5).
     """
 
     method = "isotonic"
 
-    def __init__(self, x: list[float] | None = None, y: list[float] | None = None):
+    def __init__(self, x: list[float] | None = None, y: list[float] | None = None, prior: float = 1.0):
+        self.prior = float(prior)
         self.x = [0.0, 1.0] if x is None else [float(v) for v in x]
         self.y = [0.0, 1.0] if y is None else [float(v) for v in y]
         if len(self.x) != len(self.y) or not self.x:
@@ -237,11 +243,12 @@ class IsotonicCalibrator(Calibrator):
 
         knot_x: list[float] = []
         knot_y: list[float] = []
-        for value, _, first, last in blocks:
+        for value, weight, first, last in blocks:
+            smoothed = (value * weight + self.prior) / (weight + 2 * self.prior)
             for idx in sorted({int(first), int(last)}):
                 knot_x.append(float(xs[idx]))
-                knot_y.append(float(value))
-        self.x, self.y = knot_x, knot_y
+                knot_y.append(float(smoothed))
+        self.x, self.y = knot_x, [float(v) for v in np.maximum.accumulate(knot_y)]
         return self
 
     def predict(self, confidences: Any) -> np.ndarray:
@@ -249,11 +256,11 @@ class IsotonicCalibrator(Calibrator):
         return np.clip(values, EPS, 1.0 - EPS)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"method": self.method, "x": list(self.x), "y": list(self.y)}
+        return {"method": self.method, "x": list(self.x), "y": list(self.y), "prior": self.prior}
 
     @classmethod
     def _from_params(cls, data: dict[str, Any]) -> "IsotonicCalibrator":
-        return cls(list(data["x"]), list(data["y"]))
+        return cls(list(data["x"]), list(data["y"]), data.get("prior", 1.0))
 
 
 CALIBRATORS: dict[str, type[Calibrator]] = {
