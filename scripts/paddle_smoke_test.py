@@ -5,6 +5,7 @@ Exit code 0 = text OCR and PP-StructureV3 both work on this machine.
 """
 
 import difflib
+import gc
 import os
 import sys
 import tempfile
@@ -16,9 +17,12 @@ from PIL import Image, ImageDraw, ImageFont
 # Paddle 3.3 on Windows CPU crashes in its oneDNN kernels (ConvertPirAttribute2RuntimeAttribute
 # "Unimplemented"); the plain CPU kernels work, so MKL-DNN stays off.
 COMMON = {"device": "cpu", "enable_mkldnn": False}
-# The -L formula model segfaults on 8 GB laptops when loaded with the rest of PP-StructureV3.
+# Same PP-StructureV3 settings as the app (app/config.py): with its default server OCR models and
+# the -L formula model it runs out of memory and segfaults on an 8 GB laptop.
 STRUCTURE = {"use_seal_recognition": False, "use_chart_recognition": False,
-             "formula_recognition_model_name": "PP-FormulaNet_plus-S"}
+             "formula_recognition_model_name": "PP-FormulaNet_plus-S",
+             "text_detection_model_name": "PP-OCRv5_mobile_det",
+             "text_recognition_model_name": "en_PP-OCRv5_mobile_rec"}
 os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 LINES = ["DocBlendAI smoke test", "Confidence calibration 0.042"]
 
@@ -77,6 +81,8 @@ def main() -> int:
                 read = [t.strip() for t in result["rec_texts"]]
                 ok &= len(read) == len(LINES) and all(
                     difflib.SequenceMatcher(None, a, b).ratio() >= 0.9 for a, b in zip(read, LINES))
+        ocr = None  # free the text model first: both pipelines together need a lot of RAM
+        gc.collect()
         structure, good = step("construct PPStructureV3()", lambda: PPStructureV3(
             lang="en", use_doc_orientation_classify=False, use_doc_unwarping=False, **STRUCTURE, **COMMON))
         ok &= good
