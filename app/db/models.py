@@ -51,3 +51,26 @@ class RetrievalResultORM(Base):
     similarity: Mapped[float] = mapped_column(Float)
     confidence: Mapped[float] = mapped_column(Float)
     combined_score: Mapped[float] = mapped_column(Float)
+
+
+class OCRRunORM(Base):
+    """Experience Center run history (/studio, /api/results): one row per OCR/parse job.
+
+    NOT a synopsis entity (so not in schemas.py): it stores the PaddleOCR Experience Center's
+    result objects (docs/experience_center_contract.md §4) for history, search and review edits.
+    Page images live in settings.paddle_runs_dir/<id>/page-<n>.png.
+    """
+
+    __tablename__ = "ocr_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    filename: Mapped[str] = mapped_column(String)
+    pipeline: Mapped[str] = mapped_column(String, index=True)
+    language: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, index=True)  # queued | running | done | error
+    created_at: Mapped[str] = mapped_column(String, index=True)  # ISO 8601 UTC, sorts as text
+    page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    mean_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)  # mean calibrated
+    processing_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    full_text: Mapped[str] = mapped_column(Text, default="")  # line texts, searched by ?q=
+    result_json: Mapped[str] = mapped_column(Text, default="{}")  # the full result object (§4)
