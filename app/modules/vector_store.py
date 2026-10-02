@@ -61,6 +61,11 @@ def add_chunks(doc_id: str, chunks: list[RecognizedChunk], locations: dict[str, 
     )
 
 
+def _where(doc_ids: list[str] | None) -> dict | None:
+    """Chroma metadata filter limiting a lookup to some documents; None/empty = all documents."""
+    return {"doc_id": {"$in": list(doc_ids)}} if doc_ids else None
+
+
 def search(
     query_vector: list[float], top_k: int = 5, doc_ids: list[str] | None = None
 ) -> list[tuple[RecognizedChunk, float]]:
@@ -123,6 +128,11 @@ def get_locations(chunk_ids: list[str]) -> dict[str, dict[str, int | None]]:
         for cid, meta in zip(res["ids"], res["metadatas"])
         if "page" in meta
     }
+
+
+def get_texts(doc_ids: list[str] | None = None) -> list[str]:
+    """Text of every stored chunk of the given documents (None or empty = all documents)."""
+    return _get().get(where=_where(doc_ids), include=["documents"])["documents"]
 
 
 def delete_document(doc_id: str) -> None:

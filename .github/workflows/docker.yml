@@ -1,0 +1,87 @@
+# Build the DocBlendAI image and publish it to GitHub Container Registry, so teammates can
+# `docker compose pull` instead of building (README: "Run with Docker").
+#
+#   push to main        -> ghcr.io/<owner>/docblendai:main and :latest
+#   push a tag v1.2.3   -> ghcr.io/<owner>/docblendai:1.2.3, :1.2 and :latest
+#   pull request        -> build only (checks the Dockerfile), nothing is pushed
+#   Run workflow (manual) with "preload models" -> the same tags with a -models suffix
+#
+# Enabling it: Settings > Actions > General > Workflow permissions: "Read and write permissions".
+# The first push creates the package; make it visible to your team under the repository's
+# Packages > docblendai > Package settings (or public) so others can pull it.
+name: docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      preload_models:
+        description: "Bake the OCR / TrOCR / docTR models into the image (~2 GB larger)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image is large (torch, paddle, chromadb): make room on the runner.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image name (lowercase owner)
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/docblendai" >> "$GITHUB_OUTPUT"
+
+      - name: Tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.name.outputs.image }}
+          flavor: |
+            suffix=${{ inputs.preload_models && '-models' || '' }},onlatest=true
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,format=short
+
+      - name: Build (and push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            PRELOAD_MODELS=${{ inputs.preload_models && 'true' || 'false' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

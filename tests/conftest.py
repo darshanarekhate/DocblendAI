@@ -111,6 +111,49 @@ def no_real_htr_model(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_real_paddle_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Tests must never construct a real PaddleOCR model or import paddle (slow, GBs of RAM).
+
+    Fake models by monkeypatching paddleocr_service._construct_model (see tests/test_paddleocr_*.py).
+    Also keeps the Experience Center off data/: page images and calibration files go to tmp_path,
+    and the job manager's history goes to a throwaway SQLite file (created on first use; tests
+    can call job_manager.configure(db_session_factory) to share the client's database).
+    """
+    from app.modules import ocr_jobs, paddleocr_service
+
+    def _refuse_model(pipeline, lang):
+        pytest.fail("a test tried to construct a real Paddle model; fake _construct_model")
+
+    def _refuse_import():
+        pytest.fail("a test tried to import paddleocr; fake the engine")
+
+    monkeypatch.setattr(paddleocr_service, "_construct_model", _refuse_model)
+    monkeypatch.setattr(paddleocr_service, "_import_paddleocr", _refuse_import)
+    monkeypatch.setattr(settings, "paddle_runs_dir", tmp_path / "paddle_runs")
+    monkeypatch.setattr(settings, "paddle_calibration_dir", tmp_path / "paddle_calibration")
+
+    engines = []
+
+    def _lazy_session() -> Session:
+        if not engines:
+            engine = create_engine(
+                f"sqlite:///{(tmp_path / 'paddle_runs.db').as_posix()}", connect_args={"check_same_thread": False}
+            )
+            Base.metadata.create_all(bind=engine)
+            engines.append(engine)
+        return sessionmaker(bind=engines[0], autoflush=False, autocommit=False)()
+
+    ocr_jobs.job_manager.configure(_lazy_session)
+    paddleocr_service.paddleocr_service.unload()
+    yield
+    ocr_jobs.job_manager.reset()
+    ocr_jobs.job_manager.configure(None)
+    paddleocr_service.paddleocr_service.unload()
+    for engine in engines:
+        engine.dispose()
+
+
+@pytest.fixture(autouse=True)
 def offline_engines(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin the engine settings tests assume, and refuse to load docTR models (slow, downloads weights).
 
@@ -118,6 +161,11 @@ def offline_engines(monkeypatch: pytest.MonkeyPatch) -> None:
     no fallback answer model; test_open_source_integrations covers the alternatives with fakes.
     """
     monkeypatch.setattr(settings, "ocr_engine", "tesseract")
+    # Scanned/handwritten pages use the classic engines (faked by fake_ocr / fake_htr); the
+    # Experience Center tests switch to "paddle" with fake Paddle models (tests/paddle_fakes.py).
+    monkeypatch.setattr(settings, "extraction_engine", "classic")
+    # Gemini refinement of uploads is off unless a test fakes Gemini (tests/refine_fakes.py).
+    monkeypatch.setattr(settings, "llm_refine", False)
     monkeypatch.setattr(settings, "htr_segmenter", "projection")
     monkeypatch.setattr(settings, "htr_temperature", 1.0)
     monkeypatch.setattr(settings, "llm_fallback_model", "")
@@ -188,6 +236,10 @@ def client(
             db.close()
 
     app.dependency_overrides[get_db] = _get_test_db
+    # Uploads run as jobs (ocr_jobs.py) that write the Document row in their own sessions: same database.
+    from app.modules import ocr_jobs
+
+    ocr_jobs.job_manager.configure(db_session_factory)
     # Not used as a context manager, so the app lifespan (which creates the real DB) does not run.
     yield TestClient(app)
     app.dependency_overrides.clear()

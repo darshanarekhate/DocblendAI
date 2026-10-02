@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocBlendAI Experience Center</title>
+<meta name="description" content="Run OCR and document parsing on an image or PDF and see the page and the recognised text side by side, with calibrated confidence.">
+<!-- Apply the saved theme before the stylesheet paints, so a dark-theme user never sees a white flash. -->
+<script>
+  try { const t = localStorage.getItem("docblend-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<link rel="stylesheet" href="/static/studio.css">
+<link rel="stylesheet" href="/static/layout.css">
+</head>
+<body>
+<a class="skip" href="#results">Skip to results</a>
+
+<!-- ============ Header: title, back link, engine status, theme ============ -->
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <h1>DocBlendAI <span>Experience Center</span></h1>
+      <p>Read a page with OCR or full document parsing and check every line against the image.</p>
+    </div>
+    <nav class="top-tools" aria-label="Page tools">
+      <a class="link" href="/">&larr; Back to document QA</a>
+      <details class="engine" id="engine">
+        <summary class="pill" id="engine-pill"><span class="dot" aria-hidden="true"></span><span id="engine-label">Checking engine…</span></summary>
+        <div class="engine-panel" id="engine-panel"><p class="hint">Contacting the server…</p></div>
+      </details>
+      <label class="theme">
+        <span class="visually-hidden">Colour theme</span>
+        <select id="theme">
+          <option value="system">System theme</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ============ Controls: upload, samples, pipeline, language, queue ============ -->
+  <aside class="controls panel" aria-labelledby="controls-title">
+    <h2 id="controls-title" class="visually-hidden">Run a document</h2>
+
+    <section class="ctl ctl-upload" aria-labelledby="upload-title">
+      <h3 id="upload-title">1. Add files</h3>
+      <input type="file" id="file" class="visually-hidden" multiple
+             accept=".jpg,.jpeg,.png,.bmp,.tif,.tiff,.webp,.pdf,.docx,.xlsx,.pptx,.txt">
+      <label class="drop" id="drop" for="file">
+        <strong>Drag files here, or click to choose</strong>
+        <span>Images (JPG, PNG, BMP, TIFF, WEBP), PDF, Word / Excel / PowerPoint, or text</span>
+      </label>
+      <p class="sub-label" id="samples-label">Or try a sample</p>
+      <div class="samples" id="samples" role="group" aria-labelledby="samples-label"></div>
+    </section>
+
+    <section class="ctl ctl-options" aria-labelledby="options-title">
+      <h3 id="options-title">2. Choose how to read it</h3>
+      <fieldset class="pipelines">
+        <legend class="visually-hidden">Pipeline</legend>
+        <label class="choice">
+          <input type="radio" name="pipeline" value="ocr" checked>
+          <span><b>Text OCR</b><small>Lines of text with boxes and confidence. Fastest.</small></span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="pipeline" value="structure">
+          <span><b>Document parsing</b><small>PP-StructureV3: layout, tables, formulas and Markdown.</small></span>
+        </label>
+        <label class="choice" id="vl-choice">
+          <input type="radio" name="pipeline" value="vl" aria-describedby="vl-note">
+          <span><b>PaddleOCR-VL</b><small>Vision-language parsing of the whole page.</small>
+            <small class="unavailable" id="vl-note" hidden></small></span>
+        </label>
+      </fieldset>
+      <label class="field-label" for="language">Language</label>
+      <select id="language"></select>
+      <label class="field-label" for="format-hint">Document type</label>
+      <select id="format-hint">
+        <option value="">Detect automatically</option>
+        <option value="typed">Typed (text can be selected)</option>
+        <option value="scanned">Scanned or printed</option>
+        <option value="handwritten">Handwritten (TrOCR reads each line)</option>
+      </select>
+      <p class="hint">Typed PDFs, Word, Excel, PowerPoint and text files are read exactly, without OCR, whichever pipeline is chosen.
+        Every upload is then refined by Gemini automatically and becomes a document you can ask questions about.</p>
+      <fieldset class="prep" id="prep">
+        <legend class="field-label">Clean up the image first</legend>
+        <label><input type="checkbox" name="prep" value="deskew"> Straighten (deskew)</label>
+        <label><input type="checkbox" name="prep" value="denoise"> Remove speckles</label>
+        <label><input type="checkbox" name="prep" value="contrast"> Boost contrast</label>
+        <label><input type="checkbox" name="prep" value="binarize"> Black and white</label>
+      </fieldset>
+      <button type="button" class="link-btn" id="prep-preview">Preview on the first image in the list</button>
+      <div class="prep-view" id="prep-view" hidden aria-live="polite"></div>
+    </section>
+
+    <section class="ctl ctl-run" aria-labelledby="queue-title">
+      <div class="run-row">
+        <h3 id="queue-title">3. Run</h3>
+        <button type="button" class="btn" id="run" disabled>Run</button>
+      </div>
+      <p class="status" id="job-status" role="status" aria-live="polite"></p>
+      <ul class="queue" id="queue" aria-label="Files to process"></ul>
+      <button type="button" class="link-btn" id="clear-done" hidden>Clear finished</button>
+    </section>
+
+    <section class="ctl ctl-history" aria-labelledby="history-title">
+      <div class="run-row">
+        <h3 id="history-title">Documents</h3>
+        <button type="button" class="link-btn" id="history-refresh">Refresh</button>
+      </div>
+      <label class="visually-hidden" for="history-q">Search documents by name or text</label>
+      <input type="search" id="history-q" class="search" placeholder="Search documents">
+      <p class="hint">The same documents as the question page; deleting one here deletes it there too.</p>
+      <ul class="history" id="history" aria-label="Documents"></ul>
+    </section>
+  </aside>
+
+  <!-- ============ Results ============ -->
+  <main id="results" class="results" tabindex="-1" aria-labelledby="results-title">
+    <h2 id="results-title" class="visually-hidden">Results</h2>
+
+    <!-- Global confidence controls (apply to the image overlay and every tab). -->
+    <section class="panel global" aria-label="Confidence settings and summary">
+      <div class="global-row">
+        <div class="seg" role="group" aria-labelledby="conf-mode-label">
+          <span class="sub-label" id="conf-mode-label">Confidence</span>
+          <button type="button" class="seg-btn" id="mode-calibrated" aria-pressed="true">Calibrated</button>
+          <button type="button" class="seg-btn" id="mode-raw" aria-pressed="false">Raw</button>
+        </div>
+        <span class="badge-uncal" id="uncal-badge" hidden title="No calibrator has been fitted yet, so calibrated and raw confidence are the same. Fit one in the Calibration tab.">uncalibrated</span>
+        <label class="slider">
+          <span>Hide below <output id="min-conf-out" for="min-conf">0%</output></span>
+          <input type="range" id="min-conf" min="0" max="1" step="0.01" value="0">
+        </label>
+        <label class="slider">
+          <span>Review below <output id="threshold-out" for="threshold">70%</output></span>
+          <input type="range" id="threshold" min="0" max="1" step="0.01" value="0.7">
+        </label>
+      </div>
+      <p class="hint mode-note" id="mode-note" hidden></p>
+      <ul class="chips" id="chips" aria-label="Summary"></ul>
+      <div class="export" id="export" role="group" aria-label="Export this result" hidden>
+        <span class="sub-label">Export</span>
+        <button type="button" class="chip-btn" data-fmt="txt">TXT</button>
+        <button type="button" class="chip-btn" data-fmt="layout" title="Monospace text with the page's spacing and columns">Layout text</button>
+        <button type="button" class="chip-btn" data-fmt="md">Markdown</button>
+        <button type="button" class="chip-btn" data-fmt="json">JSON</button>
+        <button type="button" class="chip-btn" data-fmt="csv">CSV</button>
+        <button type="button" class="chip-btn" data-fmt="docx">Word</button>
+        <button type="button" class="chip-btn" data-fmt="pdf">PDF</button>
+        <span class="status" id="export-status" role="status" aria-live="polite"></span>
+      </div>
+      <div class="refine-bar" id="refine-bar" hidden>
+        <span class="llm-badge" id="llm-badge"></span>
+        <span class="hint" id="refine-msg"></span>
+        <button type="button" class="link-btn" id="show-original" aria-pressed="false">Show original</button>
+        <button type="button" class="link-btn" id="revert-btn">Revert to original</button>
+        <button type="button" class="link-btn" id="reapply-btn" hidden>Use refined text</button>
+        <button type="button" class="link-btn" id="retry-btn" hidden>Retry</button>
+        <a class="link-btn" id="ask-link" href="/" hidden>Ask questions &rarr;</a>
+        <progress id="refine-progress" max="1" hidden aria-label="Refinement progress"></progress>
+        <span class="status" id="refine-status" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <div class="panes">
+      <!-- LEFT: page image with confidence-coloured line boxes -->
+      <section class="panel pane pane-image" aria-labelledby="image-title">
+        <div class="pane-head">
+          <h3 id="image-title">Page</h3>
+          <div class="tools" role="toolbar" aria-label="Page view">
+            <button type="button" class="icon-btn" id="zoom-out" aria-label="Zoom out" title="Zoom out (−)">&minus;</button>
+            <span class="zoom-val" id="zoom-val" aria-live="polite">100%</span>
+            <button type="button" class="icon-btn" id="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
+            <button type="button" class="icon-btn wide" id="zoom-fit" title="Fit page (0)">Fit</button>
+            <span class="pager">
+              <button type="button" class="icon-btn" id="page-prev" aria-label="Previous page" title="Previous page (←)">&lsaquo;</button>
+              <span id="page-label" aria-live="polite">No page</span>
+              <button type="button" class="icon-btn" id="page-next" aria-label="Next page" title="Next page (→)">&rsaquo;</button>
+            </span>
+          </div>
+        </div>
+        <div class="viewer" id="viewer" tabindex="0" role="group"
+             aria-label="Page image. Drag to pan, Ctrl or Cmd plus mouse wheel to zoom, arrow keys change page, plus and minus zoom, 0 fits.">
+          <div class="stage" id="stage" hidden>
+            <img id="page-img" alt="" draggable="false">
+            <svg id="overlay" class="overlay" aria-hidden="true"></svg>
+          </div>
+          <div class="placeholder" id="placeholder">
+            <strong>No document yet</strong>
+            <span>Add a file or pick a sample, then press Run. The page appears here with a box around every line it read.</span>
+          </div>
+        </div>
+        <ul class="legend-row" aria-label="Box colours">
+          <li><i class="sw certain"></i> confident</li>
+          <li><i class="sw moderate"></i> check if important</li>
+          <li><i class="sw unreadable"></i> needs review</li>
+        </ul>
+      </section>
+
+      <!-- RIGHT: tabs -->
+      <section class="panel pane pane-tabs" aria-label="Parsed result">
+        <div class="tabs" role="tablist" aria-label="Result views" id="tablist">
+          <button type="button" role="tab" id="tab-text" aria-controls="panel-text" aria-selected="true">Text</button>
+          <button type="button" role="tab" id="tab-layout" aria-controls="panel-layout" aria-selected="false" tabindex="-1">Layout</button>
+          <button type="button" role="tab" id="tab-changes" aria-controls="panel-changes" aria-selected="false" tabindex="-1">Changes <span class="tab-badge" id="changes-badge" hidden></span></button>
+          <button type="button" role="tab" id="tab-markdown" aria-controls="panel-markdown" aria-selected="false" tabindex="-1">Markdown</button>
+          <button type="button" role="tab" id="tab-json" aria-controls="panel-json" aria-selected="false" tabindex="-1">JSON</button>
+          <button type="button" role="tab" id="tab-tables" aria-controls="panel-tables" aria-selected="false" tabindex="-1">Tables</button>
+          <button type="button" role="tab" id="tab-plugins" aria-controls="panel-plugins" aria-selected="false" tabindex="-1">Plugins</button>
+          <button type="button" role="tab" id="tab-calibration" aria-controls="panel-calibration" aria-selected="false" tabindex="-1">Calibration</button>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-text" aria-labelledby="tab-text">
+          <p class="hint" id="text-hint">Click a line to correct it. Enter saves, Esc cancels.
+            <span class="legend-words"><span class="w-corr">corrected</span> <span class="w-inf">inferred</span> by the LLM; hover a word for the original.</span></p>
+          <ol class="lines" id="lines"></ol>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-layout" aria-labelledby="tab-layout" hidden>
+          <div class="panel-tools">
+            <button type="button" class="icon-btn" id="layout-out" aria-label="Zoom out the layout">&minus;</button>
+            <span class="zoom-val" id="layout-zoom" aria-live="polite">Fit</span>
+            <button type="button" class="icon-btn" id="layout-in" aria-label="Zoom in the layout">+</button>
+            <button type="button" class="icon-btn wide" id="layout-fit">Fit</button>
+            <span class="hint" id="layout-note">The page rebuilt from its layout: words, tables and figures where they are on the page.</span>
+          </div>
+          <div class="layout-view" id="layout-view"></div>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-changes" aria-labelledby="tab-changes" hidden>
+          <div id="changes-view"></div>
+          <section class="versions" aria-labelledby="versions-title">
+            <div class="run-row">
+              <h4 id="versions-title">Versions</h4>
+              <button type="button" class="link-btn" id="versions-refresh">Refresh</button>
+            </div>
+            <p class="hint">The original extraction, the LLM's refinement, edits and reverts are all kept. Compare one with the current text, or restore it.</p>
+            <ol class="versions-list" id="versions"></ol>
+            <div id="version-compare" aria-live="polite"></div>
+          </section>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-markdown" aria-labelledby="tab-markdown" hidden>
+          <div class="panel-tools">
+            <div class="seg" role="group" aria-label="Markdown view">
+              <button type="button" class="seg-btn" id="md-rendered" aria-pressed="true">Rendered</button>
+              <button type="button" class="seg-btn" id="md-raw" aria-pressed="false">Raw</button>
+            </div>
+            <button type="button" class="btn ghost" id="md-copy">Copy</button>
+            <button type="button" class="btn ghost" id="md-download">Download .md</button>
+          </div>
+          <div class="md" id="md-view"></div>
+          <pre class="code" id="md-source" hidden></pre>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-json" aria-labelledby="tab-json" hidden>
+          <div class="panel-tools">
+            <button type="button" class="btn ghost" id="json-copy">Copy</button>
+            <button type="button" class="btn ghost" id="json-download">Download .json</button>
+          </div>
+          <pre class="code" id="json-view"></pre>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-tables" aria-labelledby="tab-tables" hidden>
+          <div id="tables-view"></div>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-plugins" aria-labelledby="tab-plugins" hidden>
+          <p class="hint">Extra steps that run on the current result, such as pulling out named fields or translating the text.</p>
+          <div id="plugins-view"><p class="hint">Loading plugins…</p></div>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-calibration" aria-labelledby="tab-calibration" hidden>
+          <div id="calib-view"><p class="hint">Loading the calibration report…</p></div>
+          <div class="calib-actions">
+            <label class="slider wide">
+              <span>Review threshold <output id="threshold2-out" for="threshold2">70%</output></span>
+              <input type="range" id="threshold2" min="0" max="1" step="0.01" value="0.7">
+            </label>
+            <p class="hint">Lines whose confidence is below this are flagged "needs review" and drawn red. It only changes this view; the server default stays the same.</p>
+            <div class="refit">
+              <button type="button" class="btn" id="refit-sample">Refit on sample data</button>
+              <span class="or">or</span>
+              <button type="button" class="btn ghost" id="calib-zip-btn">Upload labelled .zip</button>
+              <input type="file" id="calib-zip" accept=".zip,application/zip" hidden>
+              <label class="inline-field">Match
+                <select id="calib-match">
+                  <option value="cer">Close match (low character error rate)</option>
+                  <option value="exact">Exact text only</option>
+                </select>
+              </label>
+            </div>
+            <details class="zip-help">
+              <summary>What goes in the .zip?</summary>
+              <p>A <code>labels.csv</code> with the columns <code>image,text</code>, plus the images it names (paths relative to the zip root).
+                <code>text</code> is the correct transcription of the image, one line of text per line (put the cell in quotes when it spans several lines).
+                Each image is read with Text OCR; a line counts as correct when it matches the transcription, and the calibrator learns how often each confidence level is right.</p>
+            </details>
+            <p class="status" id="calib-status" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/static/layout.js"></script>
+<script src="/static/studio.js"></script>
+</body>
+</html>

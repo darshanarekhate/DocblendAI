@@ -30,6 +30,11 @@ MODERATE_MIN_SIM = 0.58
 CERTAIN_MIN_CONF = 0.85
 MODERATE_MIN_CONF = 0.60
 UNREADABLE_MAX_CONF = 0.35
+# Text an LLM corrected or inferred ("Refine with LLM", automatic correction) was not read off
+# the page, so it never raises reliability: its confidence is capped just below
+# CERTAIN_MIN_CONF, i.e. evidence resting on it is at most Moderate (qa_index.py applies this).
+LLM_TEXT_MAX_CONF = round(CERTAIN_MIN_CONF - 0.01, 2)
+LLM_SOURCES = frozenset({"llm", "llm-auto"})
 
 # Best to worst; used to combine labels ("the worse of two").
 TIER_ORDER = [
