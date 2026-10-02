@@ -1,23 +1,48 @@
-# Alternative to the local venv: runs the whole pipeline in one container.
-#   docker compose up --build
-# Secrets come from .env (copy .env.example); data/ is bind-mounted so the SQLite DB,
-# ChromaDB and uploads are the same ones the local venv uses.
+# DocBlendAI in Docker: the QA page (/) and the Experience Center (/studio) on http://localhost:8000.
+#
+#   docker compose up -d --build        build the image here and start
+#   docker compose pull && docker compose up -d --no-build
+#                                       use a pre-built image instead (DOCBLENDAI_IMAGE, see README)
+#   docker compose logs -f              follow the logs;   docker compose down   stop
+#
+# Or run scripts/docker-start.ps1 (Windows) / scripts/docker-start.sh (Linux, macOS).
+# Settings and the Gemini key come from .env (copy .env.example); values below override it.
 services:
   docblendai:
-    build: .
-    image: docblendai:latest
+    image: ${DOCBLENDAI_IMAGE:-ghcr.io/darshanarekhate/docblendai:latest}
+    build:
+      context: .
+      args:
+        # true: bake the OCR / TrOCR / docTR models into the image (~2 GB larger, no first-run download)
+        PRELOAD_MODELS: ${PRELOAD_MODELS:-false}
     ports:
-      - "8000:8000"
+      - "${DOCBLENDAI_PORT:-8000}:8000"
     env_file:
       - path: .env
         required: false
     environment:
       PADDLE_DEVICE: cpu
+      # oneDNN speeds up paddle on CPU but crashes with paddle 3.3 on Windows; false is the safe
+      # default. Set PADDLE_ENABLE_MKLDNN=true in .env to try it here (README: "Run with Docker").
+      PADDLE_ENABLE_MKLDNN: ${PADDLE_ENABLE_MKLDNN:-false}
+      TESSERACT_CMD: ""   # the container's tesseract is on PATH (ignore a Windows path from .env)
     volumes:
+      # SQLite database, ChromaDB, uploads, Experience Center runs and calibration: the same data/
+      # folder the local venv uses, so nothing is lost when the container is rebuilt.
       - ./data:/app/data
+      # PaddleOCR / TrOCR / docTR weights: downloaded once (or copied from a PRELOAD_MODELS image
+      # when the volume is first created), kept across rebuilds.
       - model-cache:/models
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
     restart: unless-stopped
+    # Memory: 8 GB recommended. PP-StructureV3 + TrOCR + docTR need ~4-6 GB on CPU, more on big
+    # pages; on Docker Desktop raise Settings > Resources > Memory to at least 8 GB. To cap it:
+    # mem_limit: 8g
 
 volumes:
-  # PaddleOCR / TrOCR / docTR weights: downloaded once, kept across rebuilds.
   model-cache:

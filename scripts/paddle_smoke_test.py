@@ -15,8 +15,10 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 # Paddle 3.3 on Windows CPU crashes in its oneDNN kernels (ConvertPirAttribute2RuntimeAttribute
-# "Unimplemented"); the plain CPU kernels work, so MKL-DNN stays off.
-COMMON = {"device": "cpu", "enable_mkldnn": False}
+# "Unimplemented"); the plain CPU kernels work, so MKL-DNN is off unless PADDLE_ENABLE_MKLDNN=true
+# (to test whether oneDNN works on this machine, e.g. in the Linux Docker container).
+MKLDNN = os.environ.get("PADDLE_ENABLE_MKLDNN", "false").strip().lower() in ("1", "true", "yes")
+COMMON = {"device": "cpu", "enable_mkldnn": MKLDNN}
 # Same PP-StructureV3 settings as the app (app/config.py): with its default server OCR models and
 # the -L formula model it runs out of memory and segfaults on an 8 GB laptop.
 STRUCTURE = {"use_seal_recognition": False, "use_chart_recognition": False,
@@ -59,6 +61,7 @@ def main() -> int:
     import paddle
     import paddleocr
 
+    print(f"MKL-DNN (oneDNN): {'on' if MKLDNN else 'off'}")
     print(f"python {sys.version.split()[0]} | paddle {paddle.__version__} | paddleocr {paddleocr.__version__} "
           f"| cv2 {cv2.__version__} | PyMuPDF {pymupdf.VersionBind}")
     from paddleocr import PaddleOCR, PPStructureV3

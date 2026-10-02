@@ -20,4 +20,3 @@ paddle-venv/
 data/paddle_runs/
 data/paddle_calibration/
 .claude/worktrees/
-.claude/launch.json
