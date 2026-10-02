@@ -67,7 +67,8 @@ SQLite database).
 - **Build**: 10–20 minutes the first time (downloads ~2 GB of Python packages, CPU-only PyTorch);
   later builds after a code change take seconds, after a `requirements.txt` change a few minutes
   (BuildKit pip cache).
-- **Image size**: about 4 GB (estimate: the image was not built on the authoring machine). With
+- **Image size**: about 3 GB (estimate from the 2.2 GB of installed Python packages; the image
+  was not built on the authoring machine). With
   models baked in (`PRELOAD_MODELS=true`) about 2 GB more.
 - **Models**: by default PaddleOCR / PP-StructureV3 (~1.2 GB), TrOCR (~0.5 GB) and docTR
   (~160 MB) download on first use into the `model-cache` volume, once (~2 GB in total). To ship them in the image
