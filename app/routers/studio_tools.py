@@ -20,7 +20,7 @@ from fastapi.responses import Response
 from app.config import settings
 from app.modules import exporters
 from app.modules import preprocess as preprocess_steps
-from app.modules.ocr_jobs import job_manager, page_image_for
+from app.modules.ocr_jobs import job_manager, page_image_path
 from app.plugins import PLUGINS, PluginError, PluginModelError, PluginUnavailableError
 from app.routers.paddleocr import _preprocess, _save_upload, _upload_kind
 
@@ -51,7 +51,7 @@ def export_result(run_id: str, fmt: str) -> Response:
     if fmt not in exporters.FORMATS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown format {fmt!r}; use one of {', '.join(exporters.FORMATS)}")
     result = _finished_result(run_id)
-    page_images = [page_image_for(run_id, page) for page in result.get("pages") or []]
+    page_images = [page_image_path(run_id, i) for i in range(len(result.get("pages") or []))]
     try:
         content, media_type, ext = exporters.export(
             result, fmt, [p if p.exists() else None for p in page_images], settings.paddle_pdf_dpi

@@ -70,13 +70,12 @@ class Settings(BaseSettings):
     # types; ~1 min per page on CPU) or "ocr" (text lines only; a few seconds per page).
     ingest_pipeline: str = "structure"
 
-    # "Refine with LLM": a refined line that changes more than this share of its characters is
-    # rejected (original kept, line flagged).
+    # Every upload's text is refined by Gemini (the `refine` plugin) and the result used
+    # automatically; the original extraction is always kept (Revert / Show original).
+    llm_refine: bool = True
+    # A refined line that changes more than this share of its characters is rejected
+    # (the recognised text is kept and the line flagged).
     refine_max_change: float = 0.4
-    # Automatic correction after extraction: only lines below review_threshold are sent, and a
-    # stricter limit applies (reject if CER against the recognised text > this).
-    auto_refine: bool = True
-    auto_refine_max_change: float = 0.3
 
     # OCR / HTR (build step 4)
     tesseract_cmd: str = ""  # path to tesseract.exe if it is not on PATH

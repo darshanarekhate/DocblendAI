@@ -164,7 +164,8 @@ def offline_engines(monkeypatch: pytest.MonkeyPatch) -> None:
     # Scanned/handwritten pages use the classic engines (faked by fake_ocr / fake_htr); the
     # Experience Center tests switch to "paddle" with fake Paddle models (tests/paddle_fakes.py).
     monkeypatch.setattr(settings, "extraction_engine", "classic")
-    monkeypatch.setattr(settings, "auto_refine", False)
+    # Gemini refinement of uploads is off unless a test fakes Gemini (tests/refine_fakes.py).
+    monkeypatch.setattr(settings, "llm_refine", False)
     monkeypatch.setattr(settings, "htr_segmenter", "projection")
     monkeypatch.setattr(settings, "htr_temperature", 1.0)
     monkeypatch.setattr(settings, "llm_fallback_model", "")
@@ -235,6 +236,10 @@ def client(
             db.close()
 
     app.dependency_overrides[get_db] = _get_test_db
+    # Uploads run as jobs (ocr_jobs.py) that write the Document row in their own sessions: same database.
+    from app.modules import ocr_jobs
+
+    ocr_jobs.job_manager.configure(db_session_factory)
     # Not used as a context manager, so the app lifespan (which creates the real DB) does not run.
     yield TestClient(app)
     app.dependency_overrides.clear()

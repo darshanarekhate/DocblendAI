@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 ProgressFn = Callable[[float, str], None]
 ImageUrlFn = Callable[[int], str]
 
-# Office kinds (incl. .xlsx, which only the Experience Center converted before) are typed.
+# Office and text files are always typed (file_types.TEXT_KINDS).
 TYPED_SUFFIXES = frozenset({".docx", ".pptx", ".xlsx", ".txt"})
 # Pages sampled with TrOCR to decide scanned vs handwritten (same as format_detection).
 HTR_SAMPLE_PAGES = 2
@@ -120,36 +120,12 @@ def _office_markdown(path: Path, pages_text: list[str]) -> str:
     return "\n\n".join(pages_text)
 
 
-def _parse_xlsx(path: Path) -> list[tuple[str, float]]:
-    """One entry per sheet, cells separated like text_parser's table rows (two spaces)."""
-    from openpyxl import load_workbook
-
-    from app.modules.text_parser import CELL_SEPARATOR, TYPED_CONFIDENCE
-
-    try:
-        book = load_workbook(path, read_only=True, data_only=True)
-    except Exception as exc:
-        raise ExtractionError(f"not a readable Excel workbook: {exc}") from exc
-    pages = []
-    try:
-        for sheet in book.worksheets:
-            rows = []
-            for row in sheet.iter_rows(values_only=True):
-                cells = ["" if v is None else str(v).strip() for v in row]
-                if any(cells):
-                    rows.append(CELL_SEPARATOR.join(c for c in cells if c))
-            pages.append(("\n".join(rows), TYPED_CONFIDENCE))
-    finally:
-        book.close()
-    return pages
-
-
 def _typed_office(path: Path) -> Extraction:
     from app.modules import text_parser
     from app.modules.file_types import UnreadableFileError
 
     try:
-        parsed = _parse_xlsx(path) if path.suffix.lower() == ".xlsx" else text_parser.parse(str(path))
+        parsed = text_parser.parse(str(path))
     except UnreadableFileError as exc:
         raise ExtractionError(str(exc)) from exc
     texts = [text for text, _ in parsed] or [""]

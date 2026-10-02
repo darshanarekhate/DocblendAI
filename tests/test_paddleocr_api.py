@@ -193,9 +193,7 @@ def test_patch_lines_marks_edits(ec):
     assert body["pages"][0]["lines"][1]["edited"] is False
     assert body["summary"]["needs_review"] == 0
     assert body["markdown"].startswith("Calibration Report!\n")
-    persisted = ec.get(f"/api/results/{run['id']}").json()
-    assert persisted.pop("active_job") is None
-    assert persisted == body  # persisted
+    assert ec.get(f"/api/results/{run['id']}").json() == body  # persisted (incl. the QA re-index state)
     assert len(ec.get("/api/results", params={"q": "Report!"}).json()) == 1
 
     bad = ec.patch(f"/api/results/{run['id']}/lines", json=[{"page": 0, "line": 99, "text": "x"}])

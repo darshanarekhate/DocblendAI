@@ -5,7 +5,7 @@ format detection, and extraction agree on what a file is.
 
 - PDF: typed (text layer), scanned, or handwritten; detected per file
 - IMAGE (photos, scans): scanned or handwritten, never typed (no text layer)
-- DOCX, PPTX, TXT: always typed; their text is read directly
+- DOCX, PPTX, XLSX, TXT: always typed; their text is read directly
 
 Uses from schemas.py: nothing.
 """
@@ -19,6 +19,7 @@ class FileKind(str, Enum):
     IMAGE = "image"
     DOCX = "docx"
     PPTX = "pptx"
+    XLSX = "xlsx"
     TXT = "txt"
 
 
@@ -33,11 +34,12 @@ EXTENSIONS: dict[str, FileKind] = {
     ".webp": FileKind.IMAGE,
     ".docx": FileKind.DOCX,
     ".pptx": FileKind.PPTX,
+    ".xlsx": FileKind.XLSX,
     ".txt": FileKind.TXT,
 }
 
 # Kinds whose text is read directly: never OCR/HTR, so always FormatType.TYPED.
-TEXT_KINDS = {FileKind.DOCX, FileKind.PPTX, FileKind.TXT}
+TEXT_KINDS = {FileKind.DOCX, FileKind.PPTX, FileKind.XLSX, FileKind.TXT}
 
 
 class UnreadableFileError(ValueError):

@@ -23,6 +23,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import BASE_DIR, settings
+from app.modules import document_runs
 from app.modules import paddleocr_service as svc
 from app.modules import preprocess as preprocess_steps
 from app.modules.ocr_jobs import EditError, Job, JobBusyError, job_manager, page_image_path
@@ -184,8 +185,16 @@ async def _submit_document(
         except svc.UnreadableInputError as exc:
             raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, f"{file.filename}: {exc}") from exc
         filename = Path(file.filename or f"upload{suffix}").name[:255]
-        job = await run_in_threadpool(job_manager.submit_run, path, filename, pipeline, lang, threshold, options, hint)
-        submitted = True  # the job now owns (and deletes) the temp file
+        # Shared documents: the upload is also a QA document (stored in settings.upload_dir, indexed
+        # for questions once read). No duplicate check: running a file again with another pipeline
+        # or clean-up is normal here, and retrieval already skips identical passages.
+        doc_id, stored = document_runs.new_upload_path(filename)
+        shutil.move(str(path), stored)
+        path = stored
+        job = await run_in_threadpool(
+            job_manager.submit_run, path, filename, pipeline, lang, threshold, options, hint, doc_id,
+        )
+        submitted = True  # the job now owns the file (the QA document's file; removed if reading fails)
     finally:
         if not submitted:
             path.unlink(missing_ok=True)
@@ -290,10 +299,10 @@ def edit_lines(run_id: str, edits: list[dict[str, Any]] = Body(...)) -> dict[str
 
 
 @router.get("/results/{run_id}/pages/{index}/image")
-def page_image(run_id: str, index: int, x: int | None = Query(None, ge=1, description="re-extraction number")) -> FileResponse:
+def page_image(run_id: str, index: int) -> FileResponse:
     if not run_id.isalnum() or index < 0:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such page image")
-    path = page_image_path(run_id, index, x)
+    path = page_image_path(run_id, index)
     if not path.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such page image")
     return FileResponse(path, media_type="image/png")
