@@ -27,6 +27,7 @@ def ec(client, db_session_factory, monkeypatch):
     factory = FakeFactory()
     monkeypatch.setattr(svc, "_construct_model", factory)
     monkeypatch.setattr(svc.PaddleOCRService, "installed", staticmethod(lambda: True))
+    monkeypatch.setattr(settings, "extraction_engine", "paddle")
     ocr_jobs.job_manager.configure(db_session_factory)
     client.factory = factory
     return client
@@ -148,15 +149,22 @@ def test_model_load_failure_is_503_when_waiting(ec):
 
 
 def test_office_file_runs_office_pipeline(ec, monkeypatch):
+    from docx import Document as WordDocument
+
     monkeypatch.setattr(svc.PaddleOCRService, "convert_office", lambda self, p: "# Notes\n\n| a | b |\n|---|---|\n| 1 | 2 |")
+    doc = WordDocument()
+    doc.add_heading("Notes", 1)
+    doc.add_paragraph("Normal forms remove redundancy.")
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        zf.writestr("[Content_Types].xml", "<Types/>")
+    doc.save(buf)
     body = post_ocr(ec, "notes.docx", buf.getvalue()).json()
     assert body["pipeline"] == "office" and body["status"] == "done"
     assert body["pages"][0]["image_url"] is None and body["pages"][0]["tables"][0]["rows"][1] == ["1", "2"]
     assert body["markdown"].startswith("# Notes")
-    assert body["calibration"]["status"] == "uncalibrated"
+    # Exact text (Module 2's typed path) gives the lines; typed text needs no calibration.
+    assert [l["text"] for l in body["pages"][0]["lines"]] == ["Notes", "Normal forms remove redundancy."]
+    assert body["format_type"] == "typed" and body["engine"] == "text"
+    assert body["calibration"]["status"] == "calibrated"
 
 
 def test_history_search_limit_and_order(ec):
@@ -185,7 +193,9 @@ def test_patch_lines_marks_edits(ec):
     assert body["pages"][0]["lines"][1]["edited"] is False
     assert body["summary"]["needs_review"] == 0
     assert body["markdown"].startswith("Calibration Report!\n")
-    assert ec.get(f"/api/results/{run['id']}").json() == body  # persisted
+    persisted = ec.get(f"/api/results/{run['id']}").json()
+    assert persisted.pop("active_job") is None
+    assert persisted == body  # persisted
     assert len(ec.get("/api/results", params={"q": "Report!"}).json()) == 1
 
     bad = ec.patch(f"/api/results/{run['id']}/lines", json=[{"page": 0, "line": 99, "text": "x"}])
@@ -229,7 +239,7 @@ def test_too_large_is_413(ec, monkeypatch):
     assert resp.status_code == 413 and "MB" in resp.json()["detail"]
 
 
-@pytest.mark.parametrize(("name", "data"), [("notes.txt", b"hello"), ("fake.png", b"hello"), ("fake.pdf", b"%PDF-1.4 junk")])
+@pytest.mark.parametrize(("name", "data"), [("notes.rtf", b"hello"), ("fake.png", b"hello"), ("fake.pdf", b"%PDF-1.4 junk")])
 def test_bad_type_is_415(ec, name, data):
     assert post_ocr(ec, name, data).status_code == 415
     assert ec.get("/api/results").json() == []

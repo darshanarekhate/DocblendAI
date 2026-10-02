@@ -47,10 +47,10 @@
     <section class="ctl ctl-upload" aria-labelledby="upload-title">
       <h3 id="upload-title">1. Add files</h3>
       <input type="file" id="file" class="visually-hidden" multiple
-             accept=".jpg,.jpeg,.png,.bmp,.tif,.tiff,.webp,.pdf,.docx,.xlsx,.pptx">
+             accept=".jpg,.jpeg,.png,.bmp,.tif,.tiff,.webp,.pdf,.docx,.xlsx,.pptx,.txt">
       <label class="drop" id="drop" for="file">
         <strong>Drag files here, or click to choose</strong>
-        <span>Images (JPG, PNG, BMP, TIFF, WEBP), PDF, or Word / Excel / PowerPoint</span>
+        <span>Images (JPG, PNG, BMP, TIFF, WEBP), PDF, Word / Excel / PowerPoint, or text</span>
       </label>
       <p class="sub-label" id="samples-label">Or try a sample</p>
       <div class="samples" id="samples" role="group" aria-labelledby="samples-label"></div>
@@ -76,7 +76,14 @@
       </fieldset>
       <label class="field-label" for="language">Language</label>
       <select id="language"></select>
-      <p class="hint">Word, Excel and PowerPoint files are converted straight to Markdown, whichever pipeline is chosen.</p>
+      <label class="field-label" for="format-hint">Document type</label>
+      <select id="format-hint">
+        <option value="">Detect automatically</option>
+        <option value="typed">Typed (text can be selected)</option>
+        <option value="scanned">Scanned or printed</option>
+        <option value="handwritten">Handwritten (TrOCR reads each line)</option>
+      </select>
+      <p class="hint">Typed PDFs, Word, Excel, PowerPoint and text files are read exactly, without OCR, whichever pipeline is chosen.</p>
       <fieldset class="prep" id="prep">
         <legend class="field-label">Clean up the image first</legend>
         <label><input type="checkbox" name="prep" value="deskew"> Straighten (deskew)</label>
@@ -143,6 +150,12 @@
         <button type="button" class="chip-btn" data-fmt="pdf">PDF</button>
         <span class="status" id="export-status" role="status" aria-live="polite"></span>
       </div>
+      <div class="refine-bar" id="refine-bar" hidden>
+        <button type="button" class="btn" id="refine-btn">Refine with LLM</button>
+        <span class="hint" id="refine-note">Re-reads the original file, then Gemini proposes corrections that you review line by line.</span>
+        <progress id="refine-progress" max="1" hidden aria-label="Refinement progress"></progress>
+        <span class="status" id="refine-status" role="status" aria-live="polite"></span>
+      </div>
     </section>
 
     <div class="panes">
@@ -184,6 +197,7 @@
       <section class="panel pane pane-tabs" aria-label="Parsed result">
         <div class="tabs" role="tablist" aria-label="Result views" id="tablist">
           <button type="button" role="tab" id="tab-text" aria-controls="panel-text" aria-selected="true">Text</button>
+          <button type="button" role="tab" id="tab-review" aria-controls="panel-review" aria-selected="false" tabindex="-1">Review <span class="tab-badge" id="review-badge" hidden></span></button>
           <button type="button" role="tab" id="tab-markdown" aria-controls="panel-markdown" aria-selected="false" tabindex="-1">Markdown</button>
           <button type="button" role="tab" id="tab-json" aria-controls="panel-json" aria-selected="false" tabindex="-1">JSON</button>
           <button type="button" role="tab" id="tab-tables" aria-controls="panel-tables" aria-selected="false" tabindex="-1">Tables</button>
@@ -194,6 +208,19 @@
         <div class="tabpanel" role="tabpanel" id="panel-text" aria-labelledby="tab-text">
           <p class="hint" id="text-hint">Click a line to correct it. Enter saves, Esc cancels.</p>
           <ol class="lines" id="lines"></ol>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="panel-review" aria-labelledby="tab-review" hidden>
+          <div id="review-view"></div>
+          <section class="versions" aria-labelledby="versions-title">
+            <div class="run-row">
+              <h4 id="versions-title">Versions</h4>
+              <button type="button" class="link-btn" id="versions-refresh">Refresh</button>
+            </div>
+            <p class="hint">Every extraction, refinement and edit is kept. Compare one with the current text, or restore it.</p>
+            <ol class="versions-list" id="versions"></ol>
+            <div id="version-compare" aria-live="polite"></div>
+          </section>
         </div>
 
         <div class="tabpanel" role="tabpanel" id="panel-markdown" aria-labelledby="tab-markdown" hidden>

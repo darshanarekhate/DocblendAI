@@ -82,6 +82,24 @@ pick a built-in sample; choose **Text OCR** (PP-OCRv5 mobile), **Document parsin
 - exports: TXT, Markdown, JSON, searchable PDF (page image + invisible text layer), Word, CSV
 - searchable run history (SQLite)
 
+### Refine with LLM
+
+"Refine with LLM" (button on the result toolbar) runs one background job: it **re-extracts** the
+original file (typed PDF / Word / PowerPoint / Excel / text: exact text; scans and images: PaddleOCR
+or PP-StructureV3; handwriting: TrOCR reading each of Paddle's line boxes) with the chosen clean-up,
+then sends the fresh lines with their calibrated confidence and the page structure to Gemini (the
+`refine` plugin, `app/plugins/refine.py`), which fixes misrecognised words and restores words the
+context clearly implies, line by line. The **Review** tab shows each line's recognised vs refined
+text with corrected words highlighted and inferred words marked; accept or reject per line or all.
+
+- A refined line that changes more than 40% of its characters (`REFINE_MAX_CHANGE`) is rejected:
+  the recognised text is kept and the line flagged for review.
+- Nothing is overwritten: every extraction, accepted refinement, edit and restore is a version you
+  can compare with the current text or restore (`run_versions` table).
+- Accepted lines are marked `source: "llm"`; exports use them, and LLM text never raises reliability
+  (counts at most as Moderate confidence in QA).
+- Needs `GEMINI_API_KEY`; without it (or when the free-tier quota is used up) the button and API say so.
+
 ### Confidence calibration
 
 PaddleOCR's raw line scores are over-confident on degraded scans. `app/calibration/` fits

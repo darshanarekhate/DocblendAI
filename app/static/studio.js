@@ -20,8 +20,8 @@ const SAMPLES = [
   { file: "report_table.png", label: "Report with a table" },
   { file: "noisy_scan.png", label: "Noisy, tilted scan" },
 ];
-const ACCEPTED = [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp", ".pdf", ".docx", ".xlsx", ".pptx"];
-const OFFICE = [".docx", ".xlsx", ".pptx"];
+const ACCEPTED = [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp", ".pdf", ".docx", ".xlsx", ".pptx", ".txt"];
+const OFFICE = [".docx", ".xlsx", ".pptx", ".txt"];
 const PIPELINE_LABEL = { ocr: "Text OCR", structure: "Document parsing", vl: "PaddleOCR-VL", office: "Office conversion" };
 // Used only when /api/health does not list languages (PaddleOCR language codes).
 const FALLBACK_LANGUAGES = [
@@ -188,6 +188,7 @@ async function loadHealth() {
       ["Device", eng.device || h.device], ["Calibration", calText],
       ["Review below", h.review_threshold != null ? pct(h.review_threshold) : null],
       ["Max upload", h.max_upload_mb ? `${h.max_upload_mb} MB` : null],
+      ["Gemini (refine)", h.llm ? (h.llm.enabled ? h.llm.model : "not configured") : null],
     ].filter(([, v]) => v != null && v !== "");
     const dl = el("dl");
     for (const [k, v] of rows) dl.append(el("dt", { text: k }), el("dd", { text: String(v) }));
@@ -202,6 +203,7 @@ async function loadHealth() {
 
     applyPipelineAvailability(pipes);
     fillLanguages(h.languages);
+    renderRefineBar();
     if (!state.thresholdTouched && !state.current && typeof h.review_threshold === "number") setThreshold(h.review_threshold, false);
   } catch (err) {
     box.className = "engine down";
@@ -322,6 +324,7 @@ async function runJob(job) {
   form.append("wait", "false");
   form.append("review_threshold", String(state.threshold));
   if (anyPreprocess() && !office) form.append("preprocess", JSON.stringify(preprocessOptions()));
+  if ($("format-hint").value && !office) form.append("format_hint", $("format-hint").value);
   // Office files run the "office" pipeline on either endpoint (contract §3).
   const url = job.pipeline === "ocr" ? "/api/ocr" : "/api/parse";
   if (url === "/api/parse") form.append("pipeline", job.pipeline);
@@ -462,6 +465,7 @@ function setResult(result) {
   $("export").hidden = !result?.id;
   setStatus("export-status", "");
   if (state.plugins) renderPlugins();  // enables Run, clears outputs of the previous result
+  onResultShown(result);
 }
 
 /** Re-render everything that depends on mode / thresholds (not Markdown, JSON or tables). */
@@ -763,17 +767,25 @@ function renderLines() {
   all.forEach((line, i) => {
     if (!visible(line)) return;
     const id = lineId(line, state.page, i), c = confOf(line), tier = tierOf(c);
+    const llm = isLlmLine(line);
     const textBtn = el("button", { type: "button", class: `ln-text${line.text ? "" : " empty-text"}`,
-      "aria-label": `Line ${i + 1}: ${line.text || "empty"}. Confidence ${pct(c)}${needsReview(c) ? ", needs review" : ""}. Press to edit.` },
-      line.text || "(empty)");
+      "aria-label": `Line ${i + 1}: ${line.text || "empty"}${llm ? `, corrected by Gemini from: ${line.ocr_text}` : ""}. Confidence ${pct(c)}${needsReview(c) ? ", needs review" : ""}. Press to edit.` },
+      llm && line.llm_diff ? diffNodes(line.llm_diff, "refined") : line.text || "(empty)");
     textBtn.addEventListener("click", () => selectLine(id, { edit: true }));
     const li = el("li", { class: `ln${id === state.selected ? " sel" : ""}`, "data-id": id, "data-index": String(i) },
       el("span", { class: "ln-no", "aria-hidden": "true", text: String(i + 1) }),
       textBtn,
       el("span", { class: "ln-flags", "aria-hidden": "true" },
-        line.edited ? el("span", { class: "flag edited", text: "edited" }) : null,
+        llm ? el("span", { class: "flag llm", title: line.source === "llm-auto" ? "Corrected automatically by Gemini" : "Accepted from Gemini's refinement", text: line.source === "llm-auto" ? "auto-corrected" : "LLM" })
+          : line.edited ? el("span", { class: "flag edited", text: "edited" }) : null,
+        line.llm_flag ? el("span", { class: "flag review", title: line.llm_flag, text: "LLM change rejected" }) : null,
         needsReview(c) ? el("span", { class: "flag review", text: "needs review" }) : null,
         el("span", { class: `conf ${tier}`, title: confTitle(line), text: pct(c) })));
+    if (llm && line.ocr_text != null) {
+      // Raw recognition next to the corrected text, removed / replaced words struck through.
+      li.append(el("span", { class: "ln-ocr" }, el("span", { class: "sub-label", text: "Recognised: " }),
+        line.llm_diff ? diffNodes(line.llm_diff, "original") : line.ocr_text));
+    }
     li.addEventListener("mouseenter", () => highlight(id, "list"));
     li.addEventListener("mouseleave", () => highlight(null, "list"));
     li.addEventListener("focusin", () => highlight(id, "list"));
@@ -798,7 +810,7 @@ function highlight(id, from) {
   const li = linesEl.querySelector(`li${sel}`), poly = overlay.querySelector(`polygon${sel}`);
   li?.classList.add("hl");
   poly?.classList.add("hl");
-  if (from === "list") ensureBoxVisible(id);
+  if (from === "list" || from === "review") ensureBoxVisible(id);
   if (from === "box" && li && !textPanel.hidden) scrollWithin(textPanel, li);
 }
 
@@ -1397,6 +1409,7 @@ function renderPlugins() {
   if (p.error) { view.append(el("p", { class: "empty", text: p.error })); return; }
   if (!Array.isArray(p) || !p.length) { view.append(el("p", { class: "empty", text: "No plugins are installed." })); return; }
   for (const plugin of p) {
+    if (plugin.name === "refine") continue;  // has its own "Refine with LLM" button and Review tab
     const on = plugin.enabled !== false;
     const card = el("section", { class: `plugin${on ? "" : " off"}`, "aria-label": plugin.title || plugin.name },
       el("h4", { text: plugin.title || plugin.name }),
@@ -1446,6 +1459,325 @@ function renderPlugins() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Refine with LLM: POST /api/results/{id}/refine (re-extract -> Gemini -> proposal), Review tab
+// with a per-line word diff (corrected / inferred / removed words), accept / reject per line or
+// all, and the run's versions (compare with the current text, restore). See contract §7.
+// ---------------------------------------------------------------------------------------------
+
+state.review = null;      // pending proposal of the current run: {id, seq, status, data: {lines, counts, ...}}
+state.refineJob = null;   // job id being polled
+const STATUS_LABEL = { corrected: "corrected", inferred: "inferred", rejected: "rejected", unchanged: "unchanged" };
+const isLlmLine = (line) => line && (line.source === "llm" || line.source === "llm-auto");
+
+/** Words of a diff for one side: the original (replaced/removed words struck) or the refined text
+ *  (corrected words highlighted, inferred words marked). */
+function diffNodes(ops, side) {
+  const span = el("span", { class: "diff" });
+  for (const op of ops || []) {
+    let node;
+    if (side === "original") {
+      if (op.op === "insert") continue;
+      const cls = op.op === "replace" ? "w-old" : op.op === "delete" ? "w-del" : null;
+      node = cls ? el("span", { class: cls, title: op.op === "replace" ? `corrected to "${op.refined}"` : "removed", text: op.original })
+        : document.createTextNode(op.original);
+    } else {
+      if (op.op === "delete") continue;
+      const cls = op.op === "replace" ? "w-corr" : op.op === "insert" ? "w-inf" : null;
+      node = cls ? el("span", { class: cls, title: op.op === "replace" ? `corrected from "${op.original}"` : "inferred from context (not on the page as read)", text: op.refined })
+        : document.createTextNode(op.refined);
+    }
+    if (span.childNodes.length) span.append(" ");
+    span.append(node);
+  }
+  return span;
+}
+
+function renderRefineBar() {
+  const bar = $("refine-bar"), btn = $("refine-btn"), note = $("refine-note");
+  const r = state.current;
+  bar.hidden = !r?.id || r.status !== "done";
+  if (bar.hidden) return;
+  const llm = state.health?.llm;
+  const enabled = !llm || llm.enabled !== false;
+  const busy = !!state.refineJob || !!r.active_job;
+  btn.disabled = !enabled || busy;
+  btn.textContent = busy ? "Refining…" : "Refine with LLM";
+  note.className = enabled ? "hint" : "hint bad-text";
+  note.textContent = !enabled ? (llm.message || "Gemini is not configured on this server.")
+    : busy ? "Wait for the current refinement to finish."
+    : "Re-reads the original file, then Gemini proposes corrections that you review line by line.";
+}
+
+function onResultShown(result) {
+  state.review = null;
+  $("version-compare").replaceChildren();
+  renderRefineBar();
+  renderReview();
+  if (!result?.id || result.status !== "done") return;
+  if (result.active_job && state.refineJob !== result.active_job.id) pollRefine(result.active_job.id, result.id);
+  loadReview(result.id);
+  if (!$("panel-review").hidden) loadVersions();
+}
+
+async function startRefine() {
+  const r = state.current;
+  if (!r?.id) return;
+  const body = {};
+  if (anyPreprocess() && !OFFICE.includes(extOf(r.filename))) body.preprocess = preprocessOptions();
+  if ($("format-hint").value) body.format_hint = $("format-hint").value;
+  setStatus("refine-status", "Starting…");
+  try {
+    const job = await api(`/api/results/${encodeURIComponent(r.id)}/refine`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    await pollRefine(job.job_id, r.id);
+  } catch (err) {
+    setStatus("refine-status", err.message, "error");
+    renderRefineBar();
+  }
+}
+
+async function pollRefine(jobId, runId) {
+  state.refineJob = jobId;
+  renderRefineBar();
+  const bar = $("refine-progress");
+  bar.hidden = false;
+  let failures = 0, last = "";
+  try {
+    for (;;) {
+      let j;
+      try {
+        j = await api(`/api/results/${encodeURIComponent(jobId)}`);
+        failures = 0;
+      } catch (err) {
+        if (err.status === 404 || ++failures >= MAX_POLL_FAILURES) throw err;
+        await sleep(POLL_MS);
+        continue;
+      }
+      bar.value = j.progress || 0;
+      if (j.message && j.message !== last) { setStatus("refine-status", j.message); last = j.message; }
+      if (j.status === "done" || j.status === "error") {
+        // Re-extraction replaced the current text even if Gemini then failed: show the fresh result.
+        const fresh = await api(`/api/results/${encodeURIComponent(runId)}`).catch(() => null);
+        if (fresh && state.current?.id === runId) { state.refineJob = null; replaceCurrent(fresh); }
+        if (j.status === "error") { setStatus("refine-status", j.error || "Refinement failed.", "error"); break; }
+        setStatus("refine-status", j.message || "Ready for review", "ok");
+        if (state.current?.id === runId) { await loadReview(runId); activateTab("tab-review", false); }
+        break;
+      }
+      await sleep(POLL_MS);
+    }
+  } catch (err) {
+    setStatus("refine-status", err.message, "error");
+  } finally {
+    state.refineJob = null;
+    bar.hidden = true;
+    renderRefineBar();
+  }
+}
+
+/** Swap in a new copy of the current result, keeping the page, zoom and tab. */
+function replaceCurrent(result) {
+  const page = state.page, view = { ...state.view };
+  const job = state.jobs.find((j) => j.key === state.currentKey);
+  if (job) job.result = result;
+  state.current = result;
+  state.page = clamp(page, 0, Math.max(0, (result.pages || []).length - 1));
+  state.view = view;
+  renderGlobal();
+  renderPage(false);
+  renderLines();
+  renderMarkdown();
+  renderJson();
+  renderTables();
+  if (typeof renderLayout === "function") renderLayout();
+  renderRefineBar();
+}
+
+async function loadReview(runId) {
+  try {
+    state.review = await api(`/api/results/${encodeURIComponent(runId)}/refinement`);
+  } catch (err) {
+    state.review = null;
+    if (err.status !== 404) setStatus("refine-status", err.message, "error");
+  }
+  renderReview();
+}
+
+function renderReview() {
+  const view = $("review-view"), badge = $("review-badge");
+  view.replaceChildren();
+  const v = state.review, r = state.current;
+  const pending = v ? (v.data.lines || []).filter((l) => l.decision === "pending").length : 0;
+  badge.hidden = !pending;
+  badge.textContent = String(pending);
+  if (!r?.id) { view.append(el("p", { class: "empty", text: "Run a document first." })); return; }
+  if (!v) {
+    view.append(el("p", { class: "hint", text: "No refinement is waiting for review. Press \"Refine with LLM\": the original file is read again, Gemini proposes corrections for misread words, and nothing changes until you accept it." }));
+    return;
+  }
+  const data = v.data, lines = data.lines || [];
+  const counts = data.counts || {};
+  const head = el("div", { class: "review-head" },
+    el("h4", { text: `Gemini's proposal${data.mode === "auto" ? " (automatic)" : ""}` }),
+    el("ul", { class: "chips" }, ...["corrected", "inferred", "rejected", "unchanged"].filter((k) => counts[k])
+      .map((k) => el("li", { class: k === "rejected" ? "warn" : "" }, `${STATUS_LABEL[k]} `, el("b", { text: String(counts[k]) })))),
+    el("p", { class: "hint legend-words" }, "Key: ", el("span", { class: "w-corr", text: "corrected word" }), " ",
+      el("span", { class: "w-inf", text: "inferred word" }), " ", el("span", { class: "w-del", text: "removed word" }),
+      ` · lines changing more than ${pct(data.max_change ?? 0.4)} of their characters are rejected automatically`));
+  const actions = el("div", { class: "review-actions" });
+  if (pending) {
+    const all = el("button", { type: "button", class: "btn", text: `Accept all (${pending})` });
+    const none = el("button", { type: "button", class: "btn ghost", text: "Reject all" });
+    all.addEventListener("click", () => decide("accept", null, all));
+    none.addEventListener("click", () => decide("discard", null, none));
+    actions.append(all, none);
+  } else {
+    actions.append(el("p", { class: "hint", text: `Reviewed (${v.status}).` }));
+  }
+  view.append(head, actions);
+
+  const changed = lines.filter((l) => l.status !== "unchanged");
+  if (!changed.length) view.append(el("p", { class: "empty", text: "Gemini found nothing to correct." }));
+  const ol = el("ol", { class: "review-list" });
+  for (const l of changed) ol.append(reviewRow(l));
+  view.append(ol);
+  const same = lines.length - changed.length;
+  if (same) view.append(el("p", { class: "hint", text: `${same} line${same === 1 ? "" : "s"} unchanged.` }));
+}
+
+function reviewRow(l) {
+  const m = /^p(\d+)-l(\d+)$/.exec(l.line_id);
+  const where = m ? `p. ${Number(m[1]) + 1}, line ${Number(m[2]) + 1}` : l.line_id;
+  const li = el("li", { class: `rv ${l.status} ${l.decision}`, "data-id": l.line_id },
+    el("div", { class: "rv-top" },
+      el("button", { type: "button", class: "link-btn rv-where", title: "Show this line on the page", text: where }),
+      el("span", { class: `flag st-${l.status}`, text: STATUS_LABEL[l.status] || l.status }),
+      el("span", { class: "hint", text: `${pct(l.change_ratio)} changed${l.confidence != null ? ` · confidence ${pct(l.confidence)}` : ""}` })),
+    el("div", { class: "rv-cols" },
+      el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: "Recognised" }), el("p", {}, diffNodes(l.diff, "original"))),
+      el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: "Refined" }), el("p", {}, diffNodes(l.diff, "refined")))));
+  if (l.reason) li.append(el("p", { class: "rv-reason", text: l.reason }));
+  if (l.decision === "pending") {
+    const ok = el("button", { type: "button", class: "btn ghost", text: "Accept" });
+    const no = el("button", { type: "button", class: "btn ghost", text: "Reject" });
+    ok.addEventListener("click", () => decide("accept", [l.line_id], ok));
+    no.addEventListener("click", () => decide("reject", [l.line_id], no));
+    li.append(el("div", { class: "rv-actions" }, ok, no));
+  } else if (l.decision !== "n/a") {
+    li.append(el("span", { class: `rv-decision ${l.decision}`, text: l.decision === "conflict" ? "not applied: the line changed since" : l.decision }));
+  }
+  li.querySelector(".rv-where").addEventListener("click", () => showLine(l.line_id));
+  li.addEventListener("mouseenter", () => highlight(l.line_id, "review"));
+  li.addEventListener("mouseleave", () => highlight(null, "review"));
+  return li;
+}
+
+/** Go to a line's page and select it (ids are "p<page>-l<line>"). */
+function showLine(id) {
+  const m = /^p(\d+)-l\d+$/.exec(id);
+  if (m && Number(m[1]) !== state.page) goPage(Number(m[1]) - state.page);
+  selectLine(id);
+  ensureBoxVisible(id);
+}
+
+async function decide(action, lineIds, button) {
+  const r = state.current, v = state.review;
+  if (!r?.id || !v) return;
+  button.disabled = true;
+  try {
+    const res = await api(`/api/results/${encodeURIComponent(r.id)}/refinements/${encodeURIComponent(v.id)}/${action}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: action === "discard" ? undefined : JSON.stringify(lineIds ? { line_ids: lineIds } : {}),
+    });
+    if (res.result) replaceCurrent(res.result);
+    const n = lineIds ? lineIds.length : null;
+    setStatus("refine-status", action === "accept" ? `Accepted${n ? ` ${n} line${n === 1 ? "" : "s"}` : " all pending changes"}.`
+      : action === "discard" ? "Rejected every pending change; the text is unchanged." : "Rejected.", "ok");
+  } catch (err) {
+    setStatus("refine-status", err.message, "error");
+  }
+  await loadReview(r.id);
+  loadVersions();
+}
+
+$("refine-btn").addEventListener("click", startRefine);
+
+// --- versions -------------------------------------------------------------------------------
+
+async function loadVersions() {
+  const ol = $("versions"), r = state.current;
+  if (!r?.id) { ol.replaceChildren(); return; }
+  try {
+    const rows = await api(`/api/results/${encodeURIComponent(r.id)}/versions`);
+    ol.replaceChildren();
+    if (!rows.length) { ol.append(el("li", { class: "empty", text: "No versions yet." })); return; }
+    for (const v of [...rows].reverse()) {
+      const when = new Date(v.created_at);
+      const li = el("li", { class: `ver ${v.kind}` },
+        el("span", { class: "ver-n", text: `v${v.seq}` }),
+        el("span", { class: "ver-label", text: v.label }),
+        el("span", { class: "hint", text: [v.kind === "refinement" ? v.status : null,
+          Number.isNaN(when.getTime()) ? null : when.toLocaleString([], { dateStyle: "short", timeStyle: "short" })].filter(Boolean).join(" · ") }));
+      if (v.kind === "refinement") {
+        const open = el("button", { type: "button", class: "link-btn", text: ["pending", "partial"].includes(v.status) ? "Review" : "View" });
+        open.addEventListener("click", async () => {
+          try { state.review = await api(`/api/results/${encodeURIComponent(r.id)}/versions/${encodeURIComponent(v.id)}`); renderReview(); }
+          catch (err) { setStatus("refine-status", err.message, "error"); }
+        });
+        li.append(open);
+      } else {
+        const cmp = el("button", { type: "button", class: "link-btn", text: "Compare" });
+        const back = el("button", { type: "button", class: "link-btn", text: "Restore" });
+        cmp.addEventListener("click", () => compareVersion(v));
+        back.addEventListener("click", () => restoreVersion(v));
+        li.append(cmp, back);
+      }
+      ol.append(li);
+    }
+  } catch (err) {
+    ol.replaceChildren(el("li", { class: "empty", text: err.message }));
+  }
+}
+
+async function compareVersion(v) {
+  const box = $("version-compare"), r = state.current;
+  box.replaceChildren(el("p", { class: "hint", text: "Comparing…" }));
+  try {
+    const res = await api(`/api/results/${encodeURIComponent(r.id)}/versions/${encodeURIComponent(v.id)}/compare`);
+    box.replaceChildren(el("h4", { text: `v${v.seq} → current: ${res.changes.length} changed line${res.changes.length === 1 ? "" : "s"}` }));
+    const ol = el("ol", { class: "review-list" });
+    for (const c of res.changes) {
+      const li = el("li", { class: `rv ${c.status}`, "data-id": c.line_id },
+        el("div", { class: "rv-top" }, el("span", { class: "rv-where", text: c.line_id }), el("span", { class: "flag", text: c.status })),
+        el("div", { class: "rv-cols" },
+          el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: `v${v.seq}` }), el("p", {}, c.diff ? diffNodes(c.diff, "original") : c.before ?? "—")),
+          el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: "Current" }), el("p", {}, c.diff ? diffNodes(c.diff, "refined") : c.after ?? "—"))));
+      ol.append(li);
+    }
+    box.append(ol);
+  } catch (err) {
+    box.replaceChildren(el("p", { class: "status error", text: err.message }));
+  }
+}
+
+async function restoreVersion(v) {
+  const r = state.current;
+  if (!confirm(`Make version ${v.seq} ("${v.label}") the current text? The current text stays in the history.`)) return;
+  try {
+    const result = await api(`/api/results/${encodeURIComponent(r.id)}/versions/${encodeURIComponent(v.id)}/restore`, { method: "POST" });
+    replaceCurrent({ ...result, id: r.id });
+    setStatus("refine-status", `Restored version ${v.seq}.`, "ok");
+  } catch (err) {
+    setStatus("refine-status", err.message, "error");
+  }
+  loadVersions();
+  loadReview(r.id);
+}
+$("versions-refresh").addEventListener("click", loadVersions);
+
+
+// ---------------------------------------------------------------------------------------------
 // Tabs (WAI-ARIA tabs pattern: arrow keys move between tabs)
 // ---------------------------------------------------------------------------------------------
 
@@ -1460,6 +1792,7 @@ function activateTab(id, focus = true) {
   }
   if (id === "tab-calibration" && !state.calibrationLoaded) loadCalibration();
   if (id === "tab-plugins" && !state.plugins) loadPlugins();
+  if (id === "tab-review" && state.current?.id) { renderReview(); loadVersions(); }
 }
 for (const t of tabs) {
   t.addEventListener("click", () => activateTab(t.id));

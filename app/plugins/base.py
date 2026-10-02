@@ -15,7 +15,18 @@ class PluginError(RuntimeError):
 
 
 class PluginModelError(PluginError):
-    """The model call failed or returned something unusable (not the caller's fault)."""
+    """The model call failed or returned something unusable (not the caller's fault).
+
+    status: HTTP status for the API (429 quota used up, 503 overloaded/bad key, 502 otherwise).
+    """
+
+    def __init__(self, message: str, status: int = 502) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class PluginUnavailableError(PluginError):
+    """The plugin cannot run here (its API key is not set)."""
 
 
 class Plugin:
@@ -44,10 +55,10 @@ def gemini(prompt: str, system: str, as_json: bool = False) -> str:
     """One Gemini call with settings.llm_model (falls back to llm_fallback_model on 429/503)."""
     from google.genai import errors, types
 
-    from app.modules.llm_answer import RETRYABLE_CODES, _client
+    from app.modules.llm_answer import NO_KEY_MESSAGE, RETRYABLE_CODES, _client, describe_gemini_error
 
     if not settings.gemini_api_key:
-        raise PluginError("GEMINI_API_KEY is not set (see .env.example)")
+        raise PluginUnavailableError(NO_KEY_MESSAGE)
     config = types.GenerateContentConfig(
         system_instruction=system,
         temperature=0.1,
@@ -63,7 +74,8 @@ def gemini(prompt: str, system: str, as_json: bool = False) -> str:
         except errors.APIError as e:
             if e.code in RETRYABLE_CODES and i < len(models) - 1:
                 continue
-            raise PluginModelError(f"Gemini call failed ({model}): {e}") from e
+            message, status = describe_gemini_error(e.code, model, e)
+            raise PluginModelError(message, status) from e
         if not resp.text:
             raise PluginModelError("Gemini returned an empty response (possibly blocked)")
         return resp.text.strip()

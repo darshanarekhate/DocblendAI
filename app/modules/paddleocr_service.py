@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"})
 PDF_SUFFIXES = frozenset({".pdf"})
 OFFICE_SUFFIXES = frozenset({".docx", ".xlsx", ".pptx"})
+TEXT_SUFFIXES = frozenset({".txt"})
 PIPELINES = ("ocr", "structure", "vl", "office")
 
 # PaddleOCR language codes offered in the UI (PaddleOCR picks the matching recognition model).
@@ -370,6 +371,34 @@ def apply_calibration(pages: list[dict[str, Any]], review_threshold: float) -> d
     return {"status": status, "method": method, "review_threshold": review_threshold}
 
 
+def review_flags(pages: list[dict[str, Any]], review_threshold: float) -> dict[str, Any]:
+    """Set needs_review on every line (below the threshold, not edited) and describe the calibration.
+
+    Lines carry their own calibrated confidence (document_extract.py): PaddleOCR lines from
+    app/calibration, TrOCR / Tesseract lines from confidence_capture's per-format tables,
+    typed text 1.0. The returned object describes the PaddleOCR calibrator when Paddle read
+    any line, else the per-format tables.
+    """
+    lines = all_lines(pages)
+    for line in lines:
+        line["needs_review"] = (not line.get("edited")) and line.get("calibrated_confidence", 0.0) < review_threshold
+    sources = {line.get("source") for line in lines}
+    if not lines or "paddleocr" in sources or None in sources:
+        active = _safe_active()
+        status = "calibrated" if active is not None else "uncalibrated"
+        return {"status": status, "method": getattr(active, "method", None) if active else None,
+                "review_threshold": review_threshold}
+    if sources <= {"text"}:
+        return {"status": "calibrated", "method": "typed text (confidence 1.0)", "review_threshold": review_threshold}
+    from app.modules import confidence_capture
+
+    fmt = "handwritten" if "trocr" in sources else "scanned"
+    fitted = bool(confidence_capture._tables(str(settings.calibration_file)).get(fmt))
+    return {"status": "calibrated" if fitted else "uncalibrated",
+            "method": f"{fmt} table (confidence_capture)" if fitted else None,
+            "review_threshold": review_threshold}
+
+
 def _safe_active(loader: Callable[[], Any] | None = None) -> Any:
     try:
         if loader is None:
@@ -415,7 +444,7 @@ def kind_of_suffix(suffix: str) -> str | None:
         return "image"
     if suffix in PDF_SUFFIXES:
         return "pdf"
-    if suffix in OFFICE_SUFFIXES:
+    if suffix in OFFICE_SUFFIXES or suffix in TEXT_SUFFIXES:
         return "office"
     return None
 
@@ -443,6 +472,9 @@ def validate_input(path: Path, kind: str) -> None:
             raise
         except Exception as exc:
             raise UnreadableInputError(f"not a readable PDF: {exc}") from exc
+    elif kind == "office" and path.suffix.lower() in TEXT_SUFFIXES:
+        if b"\x00" in path.read_bytes()[:4096]:
+            raise UnreadableInputError("not a text file (binary content)")
     elif kind == "office":
         import zipfile
 

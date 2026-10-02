@@ -20,8 +20,8 @@ from fastapi.responses import Response
 from app.config import settings
 from app.modules import exporters
 from app.modules import preprocess as preprocess_steps
-from app.modules.ocr_jobs import job_manager, page_image_path
-from app.plugins import PLUGINS, PluginError, PluginModelError
+from app.modules.ocr_jobs import job_manager, page_image_for
+from app.plugins import PLUGINS, PluginError, PluginModelError, PluginUnavailableError
 from app.routers.paddleocr import _preprocess, _save_upload, _upload_kind
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def export_result(run_id: str, fmt: str) -> Response:
     if fmt not in exporters.FORMATS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown format {fmt!r}; use one of {', '.join(exporters.FORMATS)}")
     result = _finished_result(run_id)
-    page_images = [page_image_path(run_id, i) for i in range(len(result.get("pages") or []))]
+    page_images = [page_image_for(run_id, page) for page in result.get("pages") or []]
     try:
         content, media_type, ext = exporters.export(
             result, fmt, [p if p.exists() else None for p in page_images], settings.paddle_pdf_dpi
@@ -148,11 +148,18 @@ async def run_plugin(run_id: str, name: str, options: dict[str, Any] = Body(defa
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, plugin.info()["message"])
     result = _finished_result(run_id)
     text = exporters.result_markdown(result)
+    if name == "refine" and "lines" not in options:  # refine the result's own lines (ids match)
+        from app.modules.refinement import refine_input
+
+        lines, context = refine_input(result)
+        options = {**options, "lines": lines, "context": context}
     try:
         output = await run_in_threadpool(plugin.run, text, options)
+    except PluginUnavailableError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
     except PluginModelError as exc:
         logger.warning("plugin %s failed on %s: %s", name, run_id, exc)
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+        raise HTTPException(exc.status, str(exc)) from exc
     except PluginError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     return {"plugin": name, "result_id": run_id, **output}

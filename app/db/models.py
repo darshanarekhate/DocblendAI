@@ -74,3 +74,39 @@ class OCRRunORM(Base):
     processing_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     full_text: Mapped[str] = mapped_column(Text, default="")  # line texts, searched by ?q=
     result_json: Mapped[str] = mapped_column(Text, default="{}")  # the full result object (§4)
+
+
+class RunVersionORM(Base):
+    """History of an Experience Center run's text: every extraction, refinement and edit.
+
+    NOT a synopsis entity. A run's current result lives in ocr_runs.result_json; each change
+    (re-extraction, accepted/discarded LLM refinement, manual edit, restore) is recorded here so
+    the user can compare versions or roll back. kind:
+    - "extraction" / "edit" / "restore": data_json is the full result object after that change
+    - "refinement": data_json is an LLM proposal (per-line original/refined text, diff, decision);
+      status pending | accepted | partial | discarded
+    """
+
+    __tablename__ = "run_versions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    run_id: Mapped[str] = mapped_column(String, index=True)
+    seq: Mapped[int] = mapped_column(Integer)  # 1, 2, ... per run
+    kind: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, default="")
+    label: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[str] = mapped_column(String)  # ISO 8601 UTC
+    data_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class DocumentRunORM(Base):
+    """Links a QA document (documents.doc_id) to its Experience Center run (ocr_runs.id).
+
+    NOT a synopsis entity: a link table, so neither the documents table (synopsis Document)
+    nor ocr_runs needs a new column. One upload from either page creates both, one run each.
+    """
+
+    __tablename__ = "document_runs"
+
+    doc_id: Mapped[str] = mapped_column(String, primary_key=True)
+    run_id: Mapped[str] = mapped_column(String, unique=True, index=True)

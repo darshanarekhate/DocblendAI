@@ -161,6 +161,10 @@ def offline_engines(monkeypatch: pytest.MonkeyPatch) -> None:
     no fallback answer model; test_open_source_integrations covers the alternatives with fakes.
     """
     monkeypatch.setattr(settings, "ocr_engine", "tesseract")
+    # Scanned/handwritten pages use the classic engines (faked by fake_ocr / fake_htr); the
+    # Experience Center tests switch to "paddle" with fake Paddle models (tests/paddle_fakes.py).
+    monkeypatch.setattr(settings, "extraction_engine", "classic")
+    monkeypatch.setattr(settings, "auto_refine", False)
     monkeypatch.setattr(settings, "htr_segmenter", "projection")
     monkeypatch.setattr(settings, "htr_temperature", 1.0)
     monkeypatch.setattr(settings, "llm_fallback_model", "")

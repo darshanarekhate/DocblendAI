@@ -63,8 +63,9 @@ def ask(request: AskRequest, db: Session = Depends(get_db)) -> Answer:
         label = reliability.classify_reliability(results)
         answer = llm_answer.generate_answer(query, [c for c, _ in hits], label)
     except (embedder.EmbeddingError, llm_answer.LLMError) as e:
+        # The message says what went wrong (no key, quota used up, overloaded) so the UI can show it.
         logger.error("Answering %s failed: %s", query.query_id, e)
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The answer service (LLM) failed; try again later")
+        raise HTTPException(getattr(e, "status", status.HTTP_502_BAD_GATEWAY), str(e))
 
     db.add(QueryORM(**query.model_dump()))
     db.add(AnswerORM(**answer.model_dump(), query_id=query.query_id))

@@ -147,7 +147,7 @@ def test_ocr_without_preprocess_leaves_page_alone(ec, monkeypatch):
 def test_plugins_listed_and_disabled_without_key(ec, monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", "")
     plugins = ec.get("/api/plugins").json()
-    assert {p["name"] for p in plugins} == {"kie", "translate"}
+    assert {p["name"] for p in plugins} == {"refine", "kie", "translate"}
     assert all(p["enabled"] is False for p in plugins)
     run = ocr_run(ec)
     resp = ec.post(f"/api/results/{run['id']}/plugins/kie", json={})

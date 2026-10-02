@@ -62,6 +62,22 @@ class Settings(BaseSettings):
     paddle_calibration_dir: Path = DATA_DIR / "paddle_calibration"  # fitted calibrator + report + diagram
     log_format: str = "text"  # "text" or "json" (structured logs)
 
+    # Recognition engine for scanned / handwritten pages, shared by the QA page and /studio:
+    # "paddle" (PaddleOCR / PP-StructureV3 lines; TrOCR reads handwritten lines in Paddle's boxes),
+    # "classic" (Tesseract or docTR / TrOCR on whole pages), or "auto" (paddle when installed).
+    extraction_engine: str = "auto"
+    # Paddle pipeline for documents uploaded on the QA page: "structure" (layout, tables, content
+    # types; ~1 min per page on CPU) or "ocr" (text lines only; a few seconds per page).
+    ingest_pipeline: str = "structure"
+
+    # "Refine with LLM": a refined line that changes more than this share of its characters is
+    # rejected (original kept, line flagged).
+    refine_max_change: float = 0.4
+    # Automatic correction after extraction: only lines below review_threshold are sent, and a
+    # stricter limit applies (reject if CER against the recognised text > this).
+    auto_refine: bool = True
+    auto_refine_max_change: float = 0.3
+
     # OCR / HTR (build step 4)
     tesseract_cmd: str = ""  # path to tesseract.exe if it is not on PATH
     ocr_dpi: int = 300

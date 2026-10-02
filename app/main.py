@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.db.database import init_db
 from app.logging_config import configure_logging
-from app.routers import paddleocr, query, studio_tools, upload
+from app.routers import paddleocr, query, refine, studio_tools, upload
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -46,6 +46,7 @@ app.include_router(upload.router)
 app.include_router(query.router)
 app.include_router(paddleocr.router)
 app.include_router(studio_tools.router)
+app.include_router(refine.router)
 # Experience Center assets (studio.css/js, sample images) and the QA page's shared files.
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

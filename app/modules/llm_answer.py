@@ -42,7 +42,38 @@ MAX_ATTEMPTS = 3
 
 
 class LLMError(RuntimeError):
-    """Answer generation failed: missing API key or a Gemini API error."""
+    """Answer generation failed: missing API key or a Gemini API error.
+
+    status is the HTTP status the API should answer with: 503 (no key), 429 (quota used
+    up), 502 (any other Gemini failure). The message is written for the user.
+    """
+
+    def __init__(self, message: str, status: int = 502) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+NO_KEY_MESSAGE = "Gemini is not configured: set GEMINI_API_KEY in .env (see .env.example) and restart the server."
+
+
+def describe_gemini_error(code: int | None, model: str, detail: object) -> tuple[str, int]:
+    """(message for the user, HTTP status) for a failed Gemini call.
+
+    Shared by answering, spelling, embeddings and the Experience Center plugins, so a used-up
+    free-tier quota reads the same everywhere instead of as a bare stack-trace string.
+    """
+    text = str(detail)
+    if code == 429 or "RESOURCE_EXHAUSTED" in text:
+        return (
+            f"Gemini's quota for {model} is used up for now (429). Free-tier limits reset daily: "
+            "try again later, or set LLM_MODEL / LLM_FALLBACK_MODEL in .env to another model.",
+            429,
+        )
+    if code in (500, 503) or "UNAVAILABLE" in text:
+        return f"Gemini ({model}) is overloaded or unavailable right now ({code}); try again in a minute.", 503
+    if code in (400, 401, 403) and ("API key" in text or "API_KEY" in text or "PERMISSION_DENIED" in text):
+        return f"Gemini rejected the API key ({code}): check GEMINI_API_KEY in .env.", 503
+    return f"Gemini call failed ({model}, {code}): {text}", 502
 
 
 @lru_cache
@@ -74,7 +105,7 @@ def _generate(prompt: str, system_instruction: str = SYSTEM_INSTRUCTION) -> str:
     Other errors (a bad request, a missing key) are not retried on another model.
     """
     if not settings.gemini_api_key:
-        raise LLMError("GEMINI_API_KEY is not set (see .env.example)")
+        raise LLMError(NO_KEY_MESSAGE, 503)
 
     models = [settings.llm_model]
     if settings.llm_fallback_model and settings.llm_fallback_model != settings.llm_model:
@@ -86,7 +117,7 @@ def _generate(prompt: str, system_instruction: str = SYSTEM_INSTRUCTION) -> str:
             if e.code in RETRYABLE_CODES and i < len(models) - 1:
                 logger.warning("%s unavailable (%s); answering with %s instead", model, e.code, models[i + 1])
                 continue
-            raise LLMError(f"Gemini generation failed ({model}): {e}") from e
+            raise LLMError(*describe_gemini_error(e.code, model, e)) from e
     raise AssertionError("unreachable")
 
 

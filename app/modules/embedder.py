@@ -19,7 +19,11 @@ MAX_BATCH = 100
 
 
 class EmbeddingError(RuntimeError):
-    """Embedding failed: missing API key or a Gemini API error."""
+    """Embedding failed: missing API key or a Gemini API error (status: HTTP status for the API)."""
+
+    def __init__(self, message: str, status: int = 502) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 @lru_cache
@@ -29,7 +33,9 @@ def _client(api_key: str) -> genai.Client:
 
 def _embed(texts: list[str], task_type: str) -> list[list[float]]:
     if not settings.gemini_api_key:
-        raise EmbeddingError("GEMINI_API_KEY is not set (see .env.example)")
+        from app.modules.llm_answer import NO_KEY_MESSAGE
+
+        raise EmbeddingError(NO_KEY_MESSAGE, 503)
 
     config = types.EmbedContentConfig(task_type=task_type, output_dimensionality=settings.embedding_dim)
     vectors: list[list[float]] = []
@@ -40,7 +46,9 @@ def _embed(texts: list[str], task_type: str) -> list[list[float]]:
             )
             vectors.extend(e.values for e in resp.embeddings)
     except errors.APIError as e:
-        raise EmbeddingError(f"Gemini embedding call failed: {e}") from e
+        from app.modules.llm_answer import describe_gemini_error
+
+        raise EmbeddingError(*describe_gemini_error(e.code, settings.embedding_model, e)) from e
     return vectors
 
 

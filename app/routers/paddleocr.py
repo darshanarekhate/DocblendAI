@@ -129,6 +129,18 @@ def _require_available(pipeline: str) -> None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, state["message"])
 
 
+def _llm_status() -> dict[str, Any]:
+    from app.routers.refine import llm_status
+
+    return llm_status()
+
+
+def _engine_mode() -> str:
+    from app.modules.document_extract import engine_mode
+
+    return engine_mode()
+
+
 def paddle_status(pipeline: str) -> dict[str, Any]:
     return svc.paddleocr_service.pipeline_status(pipeline)
 
@@ -142,11 +154,21 @@ async def _finish(job: Job, wait: bool) -> JSONResponse:
     return JSONResponse(job_manager.get_result(job.id) or {"id": job.id, "status": job.status})
 
 
+def _format_hint(value: str | None) -> str | None:
+    value = (value or "").strip().lower()
+    if value in ("", "auto"):
+        return None
+    if value not in ("typed", "scanned", "handwritten"):
+        raise _bad("format_hint must be typed, scanned or handwritten (or empty to detect it)")
+    return value
+
+
 async def _submit_document(
     file: UploadFile, pipeline: str, language: str, wait: str | bool, review_threshold: str | None,
-    preprocess: str | None,
+    preprocess: str | None, format_hint: str | None = None,
 ) -> JSONResponse:
     suffix, kind = _upload_kind(file.filename)
+    hint = _format_hint(format_hint)
     lang = _language(language)
     threshold = _review_threshold(review_threshold)
     options = _preprocess(preprocess)
@@ -162,7 +184,7 @@ async def _submit_document(
         except svc.UnreadableInputError as exc:
             raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, f"{file.filename}: {exc}") from exc
         filename = Path(file.filename or f"upload{suffix}").name[:255]
-        job = await run_in_threadpool(job_manager.submit_run, path, filename, pipeline, lang, threshold, options)
+        job = await run_in_threadpool(job_manager.submit_run, path, filename, pipeline, lang, threshold, options, hint)
         submitted = True  # the job now owns (and deletes) the temp file
     finally:
         if not submitted:
@@ -192,6 +214,8 @@ def experience_health() -> dict[str, Any]:
         "calibration": calibration,
         "review_threshold": settings.review_threshold,
         "max_upload_mb": settings.paddle_max_upload_mb,
+        "llm": _llm_status(),
+        "extraction_engine": _engine_mode(),
         "languages": svc.LANGUAGES,
     }
 
@@ -203,9 +227,10 @@ async def run_ocr(
     wait: str = Form("false"),
     review_threshold: str | None = Form(None),
     preprocess: str | None = Form(None),
+    format_hint: str | None = Form(None, description="typed | scanned | handwritten; empty = detect"),
 ) -> JSONResponse:
-    """Text OCR (PP-OCR) of an image or PDF; Office files are converted to Markdown instead."""
-    return await _submit_document(file, "ocr", language, wait, review_threshold, preprocess)
+    """Text OCR (PP-OCR) of an image or PDF; typed PDFs and Office/text files are read exactly."""
+    return await _submit_document(file, "ocr", language, wait, review_threshold, preprocess, format_hint)
 
 
 @router.post("/parse")
@@ -216,12 +241,13 @@ async def run_parse(
     wait: str = Form("false"),
     review_threshold: str | None = Form(None),
     preprocess: str | None = Form(None),
+    format_hint: str | None = Form(None, description="typed | scanned | handwritten; empty = detect"),
 ) -> JSONResponse:
     """Document parsing: layout blocks, tables, Markdown (PP-StructureV3, or PaddleOCR-VL)."""
     pipeline = (pipeline or "structure").strip().lower()
     if pipeline not in ("structure", "vl"):
         raise _bad("pipeline must be 'structure' or 'vl'")
-    return await _submit_document(file, pipeline, language, wait, review_threshold, preprocess)
+    return await _submit_document(file, pipeline, language, wait, review_threshold, preprocess, format_hint)
 
 
 @router.get("/results")
@@ -264,10 +290,10 @@ def edit_lines(run_id: str, edits: list[dict[str, Any]] = Body(...)) -> dict[str
 
 
 @router.get("/results/{run_id}/pages/{index}/image")
-def page_image(run_id: str, index: int) -> FileResponse:
+def page_image(run_id: str, index: int, x: int | None = Query(None, ge=1, description="re-extraction number")) -> FileResponse:
     if not run_id.isalnum() or index < 0:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such page image")
-    path = page_image_path(run_id, index)
+    path = page_image_path(run_id, index, x)
     if not path.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such page image")
     return FileResponse(path, media_type="image/png")
