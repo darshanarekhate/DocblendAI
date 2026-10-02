@@ -191,7 +191,9 @@ With `--reload`, saving a `.py` file restarts the server and interrupts a docume
 | GET | `/documents/{id}/file` | The original uploaded file, inline (document viewer) |
 | POST | `/documents/{id}/experience` | Read an earlier upload into the Experience Center |
 | DELETE | `/documents/{id}` | Remove a document from both pages (chunks, record, file, Experience Center result) |
-| POST | `/ask` | Ask a question → answer + reliability label (optional `doc_ids`: only use these documents) |
+| POST | `/ask` | Ask a question → answer + reliability label (only some documents: `doc_ids` in the body or `?doc_id=` repeated) |
+| POST | `/chat` | A question plus the last turns of the conversation (follow-ups), optional `doc_ids` → answer + sources |
+| GET | `/documents/{id}/preview` | Preview info (image pages or text pages); `/documents/{id}/pages/{n}` page PNG; `/documents/{id}/view` whole document |
 | POST | `/ask/suggest` | "Did you mean": spelling-corrected question from the selected documents' words (`question_text`, optional `doc_ids`) |
 | GET | `/answer/{id}` | Fetch a stored answer |
 | GET | `/answer/{id}/sources` | Chunks behind an answer, with similarity, confidence, content type |
@@ -348,7 +350,7 @@ venv/Scripts/python -m evaluation.make_dataset
 venv/Scripts/python -m evaluation.run_eval --fit-calibration
 ```
 
-Tests fake Tesseract, TrOCR, docTR, PaddleOCR, and Gemini, so they run offline (403 tests). The evaluation uses the
+Tests fake Tesseract, TrOCR, docTR, PaddleOCR, and Gemini, so they run offline (438 tests). The evaluation uses the
 real engines: it generates a synthetic dataset (typed, degraded scans, handwriting-style
 fonts), measures CER/WER, fits confidence calibration into `data/calibration.json`,
 and scores question answering (Exact Match, Semantic Match, retrieval hits, accuracy per

@@ -244,8 +244,11 @@ def _htr_page(page: dict[str, Any], image_path: Path) -> None:
         return
     with Image.open(image_path) as img:
         gray = denoise(img.convert("L"))
+    # The same notebook clean-up as htr_extractor.find_lines: erase rules, then whiten show-through.
     if settings.remove_ruled_lines:
         gray = line_segmentation.remove_ruled_lines(gray)
+    if settings.whiten_background:
+        gray = line_segmentation.whiten_background(gray)
     crops = []
     for line in lines:
         x0, y0, x1, y1 = line["box"]
@@ -342,10 +345,11 @@ def _classic_extract(
 
     _report(progress, 0.0, "Detecting the document format")
     page_count = format_detection.page_count(str(path))
-    format_type = format_detection.resolve_format(str(path), hint)
+    # Detection reads a few sample pages; they are reused below instead of read twice.
+    format_type, already_read = format_detection.resolve(str(path), hint)
     document = Document(doc_id="extract", file_path=str(path), format_type=format_type, page_count=page_count)
     _report(progress, 0.1, "Reading the pages")
-    extracted = format_detection.extract(document)
+    extracted = format_detection.extract(document, already_read)
     image_paths: list[Path] = []
     try:
         image_paths, _ = svc.render_pages(path, kind, pages_dir)

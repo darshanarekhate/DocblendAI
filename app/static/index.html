@@ -7,29 +7,17 @@
 <link rel="stylesheet" href="/static/layout.css">
 <style>
   :root {
-    color-scheme: light dark;  /* native scrollbars and dropdowns follow the theme */
-    --bg: #f7f5f0; --panel: #ffffff; --text: #1f1e1b; --muted: #6b675f; --faint: #8d887e; --line: #e4dfd5;
-    --accent: #2f5d50; --accent-hover: #244a40; --accent-text: #ffffff; --accent-soft: #e8efec;
-    --field: #fbfaf7; --quote: #f4f1ea;
+    color-scheme: light;
+    --bg: #eef5fc; --panel: #ffffff; --text: #1c2a3a; --muted: #5a6b7d; --faint: #8595a6; --line: #d5e3f1;
+    --accent: #3f7fbf; --accent-hover: #336ba3; --accent-text: #ffffff; --accent-soft: #e2eefa;
+    --field: #f7fbff; --quote: #eef5fc;
     --certain: #2e7d4f; --certain-bg: #e8f3ec;
     --moderate: #9a5b00; --moderate-bg: #fbf0dc;
-    --uncertain: #5f5b53; --uncertain-bg: #efece6;
+    --uncertain: #56626f; --uncertain-bg: #edf1f5;
     --unreadable: #b3261e; --unreadable-bg: #fae7e4;
     --error: #b3261e;
-    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1a1917; --panel: #23221f; --text: #ece9e2; --muted: #a8a397; --faint: #8a857a; --line: #37342f;
-      --accent: #86b8a8; --accent-hover: #9ccabb; --accent-text: #112019; --accent-soft: #28332f;
-      --field: #1e1d1a; --quote: #2a2925;
-      --certain: #7fcf9c; --certain-bg: #1f3027;
-      --moderate: #e7b565; --moderate-bg: #372b17;
-      --uncertain: #b9b4a9; --uncertain-bg: #2e2c28;
-      --unreadable: #f0907f; --unreadable-bg: #3a211d;
-      --error: #f0907f;
-    }
+    --serif: "Times New Roman", Times, "Liberation Serif", serif;
+    --sans: var(--serif);   /* one font everywhere: Times New Roman */
   }
 
   * { box-sizing: border-box; }
@@ -85,29 +73,66 @@
                padding-top: 18px; border-top: 1px solid var(--line); }
   .docs-head h3 { margin: 0; font-size: 15px; }
   .docs-head .count { font-size: 13px; color: var(--muted); }
-  .docs-sub .pick { display: flex; align-items: baseline; gap: 4px; font-size: 13px; color: var(--faint); }
-  .docs-sub .pick button { background: none; border: 0; padding: 2px 4px; border-radius: 5px; cursor: pointer;
-                            color: var(--accent); font-size: 13px; }
-  .docs-sub .pick button:hover { text-decoration: underline; text-underline-offset: 2px; }
-  .docs-sub[hidden] { display: none; }
-  .docs-sub { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
   ul.docs { list-style: none; margin: 0; padding: 0; }
-  ul.docs li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  ul.docs li { display: flex; align-items: center; gap: 12px; padding: 10px 6px; border-bottom: 1px solid var(--line); border-radius: 6px; }
+  ul.docs li.doc { cursor: pointer; }
+  ul.docs li.doc:hover { background: var(--accent-soft); }
   ul.docs li:last-child { border-bottom: 0; }
-  ul.docs input[type="checkbox"] { flex: none; width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
-  ul.docs li.off .doc-info, ul.docs li.off .ftype { opacity: 0.55; }
-  ul.docs label.doc-name { cursor: pointer; }
   .ftype { flex: none; width: 42px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
            color: var(--accent); border: 1px solid var(--line); border-radius: 5px; padding: 3px 0; background: var(--field); }
   .doc-info { flex: 1; min-width: 0; }
-  .doc-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+  .doc-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: inherit; text-decoration: none; }
+  a.ftype { text-decoration: none; }
+  .pick { flex: none; width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .scope { margin: -10px 0 14px; font-size: 14px; color: var(--muted); }
+  .scope b { color: var(--text); font-weight: 600; }
+  a.ftype:hover { border-color: var(--accent); background: var(--accent-soft); }
+  a.doc-name:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
   .doc-meta { display: block; font-size: 13px; color: var(--muted); }
   .remove { flex: none; background: none; border: 0; color: var(--faint); font-size: 13px; cursor: pointer;
             padding: 4px 6px; border-radius: 5px; text-decoration: underline; text-underline-offset: 2px; }
   .remove:hover { color: var(--error); }
-  .remove.view { color: var(--accent); }
-  .remove.view:hover { color: var(--accent-hover); }
+  .view { flex: none; color: var(--accent); font-size: 13px; padding: 4px 6px; text-underline-offset: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+  ul.docs li { align-items: flex-start; }
+  ul.docs li.processing { cursor: default; }
+  ul.docs li.processing .doc-name { color: var(--muted); }
+
+  /* --- reading progress and LLM refinement of each document --- */
+  .doc-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; font-size: 13px; color: var(--muted); }
+  .doc-state progress { width: 120px; height: 6px; accent-color: var(--accent); }
+  .doc-state .err { color: var(--error); }
+  .llm-badge { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; border: 1px solid currentColor; white-space: nowrap; }
+  .llm-badge.refined { color: var(--moderate); background: var(--moderate-bg); }
+  .llm-badge.reverted { color: var(--muted); }
+  .llm-badge.unavailable, .llm-badge.off { color: var(--unreadable); background: var(--unreadable-bg); }
+  .llm-badge.busy { color: var(--accent); background: var(--accent-soft); }
+  .doc-links { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 3px; }
+  .doc-links button, .doc-links a { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; color: var(--accent);
+                                    cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+  /* --- document shown on the page, in the right-hand column in place of "Ask a question" --- */
+  .viewer { grid-column: 2; grid-row: 1; }
+  @media (max-width: 880px) { .viewer { grid-column: 1; grid-row: auto; } }
+  .ask[hidden] { display: none; }
+  .viewer[hidden] { display: none; }
+  .viewer-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .viewer-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .viewer .close { background: none; border: 0; padding: 0; color: var(--accent); font-size: 15px; cursor: pointer; text-decoration: underline; }
+  /* the pages scroll inside the panel, so the panel stays one screen tall */
+  #viewer-pages { max-height: calc(100vh - 230px); min-height: 260px; overflow-y: auto; padding-right: 6px; }
+  .viewer .page-no { margin: 18px 0 6px; font-size: 14px; color: var(--muted); }
+  .viewer .page-no:first-child { margin-top: 0; }
+  .viewer img, .viewer pre { display: block; width: 100%; margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
+  .viewer pre { padding: 16px 18px; white-space: pre-wrap; font: 16px/1.6 var(--serif); }
+  /* view modes: the pages as uploaded, or rebuilt from their layout (with the LLM's corrections / the original text) */
+  .modes { display: flex; gap: 4px; flex-wrap: wrap; margin: -6px 0 12px; }
+  .modes button { background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 2px 11px;
+                  font: inherit; font-size: 14px; color: var(--accent); cursor: pointer; }
+  .modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .modes button:disabled { opacity: .45; cursor: not-allowed; }
+  .viewer .lt-sheet { margin: 0 auto; }
+  .viewer .lt-flow { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; }
 
   /* --- ask & answers --- */
   .ask-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
@@ -139,9 +164,8 @@
   .answer summary { cursor: pointer; color: var(--accent); font-size: 14px; }
   .source { margin-top: 12px; }
   .source .where { font-size: 14px; font-weight: 600; }
-  .source .where button { background: none; border: 0; padding: 0; font-weight: 600; font-size: 14px; cursor: pointer;
+  .source .where button { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer;
                           color: var(--accent); text-decoration: underline; text-underline-offset: 2px; text-align: left; }
-  .source .where button:hover { color: var(--accent-hover); }
 
   /* --- "Did you mean" --- */
   .did-you-mean { margin: 10px 0 0; padding: 9px 12px; border-radius: 7px; background: var(--accent-soft); font-size: 14px; }
@@ -149,46 +173,6 @@
   .did-you-mean button { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer;
                          color: var(--accent); text-decoration: underline; text-underline-offset: 2px; text-align: left; }
   .did-you-mean span { color: var(--muted); }
-
-  /* --- document viewer --- */
-  dialog.viewer { width: min(960px, calc(100vw - 32px)); height: min(88vh, 1000px); max-width: none; max-height: none;
-                  padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); }
-  dialog.viewer[open] { display: flex; flex-direction: column; }
-  dialog.viewer::backdrop { background: rgb(0 0 0 / 0.45); }
-  .viewer-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-  .viewer-head h2 { flex: 1; min-width: 0; margin: 0; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .viewer-head a { font-size: 14px; color: var(--accent); white-space: nowrap; }
-  .viewer-head button { flex: none; padding: 6px 14px; font-size: 14px; }
-  .viewer-body { flex: 1; min-height: 0; overflow: auto; background: var(--quote); }
-  .viewer-body iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
-  .viewer-body img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
-  .viewer-body pre { margin: 0; padding: 16px 18px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
-  .viewer-body .viewer-msg { padding: 24px 20px; color: var(--muted); font-size: 15px; }
-  .viewer-body .viewer-msg a { color: var(--accent); font-weight: 600; }
-  .viewer-head .modes { display: flex; gap: 4px; flex-wrap: wrap; }
-  .viewer-head .modes button { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px;
-                               font-size: 13px; color: var(--accent); cursor: pointer; font-weight: 600; }
-  .viewer-head .modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-  .viewer-head .modes button:disabled { opacity: .45; cursor: not-allowed; }
-  .viewer-pager { display: flex; gap: 6px; align-items: center; justify-content: center; padding: 6px; font-size: 13px; color: var(--muted); }
-  .viewer-pager button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 2px 10px; cursor: pointer; color: var(--text); }
-  .viewer-body .lt-sheet { margin: 12px auto; }
-  .viewer-body .lt-flow { background: var(--panel); margin: 12px; padding: 12px 18px; border-radius: 8px; }
-
-  /* --- document state: processing, LLM refinement --- */
-  .doc-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; font-size: 12.5px; color: var(--muted); }
-  .doc-state progress { width: 120px; height: 6px; accent-color: var(--accent); }
-  .doc-state .err { color: var(--error); }
-  .llm-badge { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 8px; border: 1px solid currentColor; white-space: nowrap; }
-  .llm-badge.refined { color: var(--moderate); background: var(--moderate-bg); }
-  .llm-badge.reverted { color: var(--muted); }
-  .llm-badge.unavailable, .llm-badge.off { color: var(--unreadable); background: var(--unreadable-bg); }
-  .llm-badge.busy { color: var(--accent); background: var(--accent-soft); }
-  .doc-links { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 3px; }
-  .doc-links button, .doc-links a { background: none; border: 0; padding: 0; font-size: 12.5px; color: var(--accent); cursor: pointer;
-                                    text-decoration: underline; text-underline-offset: 2px; font-family: inherit; }
-  ul.docs li { align-items: flex-start; }
-  ul.docs li.processing .doc-name { color: var(--muted); }
   .source .scores { font-size: 13px; color: var(--muted); font-weight: 400; }
   .source blockquote { margin: 6px 0 0; padding: 10px 12px; background: var(--quote); border-radius: 7px;
                        font-size: 14px; line-height: 1.55; white-space: pre-wrap; max-height: 180px; overflow: auto; }
@@ -206,11 +190,11 @@
 <main>
   <section class="panel" aria-labelledby="docs-title">
     <h2 id="docs-title">Your documents</h2>
-    <p class="lead">Add the notes you want to ask about. Each file is read (OCR for scans, TrOCR for handwriting), refined by an LLM, and listed in the <a href="/studio">Experience Center</a> too.</p>
+    <p class="lead">Add the notes you want to ask about. Each file is read (OCR for scans, TrOCR for handwriting), refined by an LLM, and also listed in the <a href="/studio">Experience Center</a>.</p>
     <form id="upload-form">
       <label class="drop" id="drop" for="file">
         <strong>Drag a file here, or click to choose</strong>
-        <span>PDF, Word, PowerPoint, Excel, text, or a photo/scan (JPG, PNG, TIFF, BMP, WEBP)</span>
+        <span>PDF, DOCX, PPTX, XLSX, TXT, PNG, JPG, etc.</span>
         <span class="chosen" id="chosen"></span>
       </label>
       <input type="file" id="file" class="visually-hidden" required
@@ -234,18 +218,13 @@
       <h3>Uploaded</h3>
       <span class="count" id="doc-count"></span>
     </div>
-    <div class="docs-sub" id="docs-sub" hidden>
-      <span id="doc-selected">Ticked documents are used for answers.</span>
-      <span class="pick" role="group" aria-label="Select documents">
-        <button type="button" id="pick-all">All</button>/<button type="button" id="pick-none">None</button>
-      </span>
-    </div>
     <ul class="docs" id="docs"></ul>
   </section>
 
-  <section class="panel" aria-labelledby="ask-title">
+  <section class="panel ask" id="ask-panel" aria-labelledby="ask-title">
     <h2 id="ask-title">Ask a question</h2>
     <p class="lead">Answers come only from your uploaded documents.</p>
+    <p class="scope" id="ask-scope"></p>
     <form id="ask-form">
       <label class="visually-hidden" for="question">Your question</label>
       <textarea id="question" placeholder="e.g. What does second normal form remove?" required></textarea>
@@ -271,21 +250,20 @@
       <p class="no-answers" id="no-answers">Your answers will appear here, newest first.</p>
     </div>
   </section>
+  <section class="panel viewer" id="viewer" aria-labelledby="viewer-title" hidden>
+    <div class="viewer-head">
+      <h2 id="viewer-title"></h2>
+      <button type="button" class="close" id="viewer-close">Close</button>
+    </div>
+    <p class="lead" id="viewer-meta"></p>
+    <div class="modes" role="group" aria-label="View">
+      <button type="button" id="mode-pages" aria-pressed="true">Pages</button>
+      <button type="button" id="mode-layout" aria-pressed="false" title="The pages rebuilt from their layout, with the LLM's corrections marked">Layout</button>
+      <button type="button" id="mode-original" aria-pressed="false" title="The layout with the text as originally recognised, before the LLM refinement">Original text</button>
+    </div>
+    <div id="viewer-pages"></div>
+  </section>
 </main>
-
-<dialog class="viewer" id="viewer" aria-labelledby="viewer-title">
-  <div class="viewer-head">
-    <h2 id="viewer-title"></h2>
-    <span class="modes" role="group" aria-label="View">
-      <button type="button" id="mode-file" aria-pressed="true">File</button>
-      <button type="button" id="mode-layout" aria-pressed="false" title="The page rebuilt from its layout, with the LLM's corrections marked">Layout</button>
-      <button type="button" id="mode-original" aria-pressed="false" title="The layout with the text as originally recognised">Original text</button>
-    </span>
-    <a id="viewer-open" target="_blank" rel="noopener">Open in new tab</a>
-    <button type="button" class="btn" id="viewer-close">Close</button>
-  </div>
-  <div class="viewer-body" id="viewer-body"></div>
-</dialog>
 
 <script src="/static/layout.js"></script>
 <script>
@@ -351,11 +329,87 @@ function setStatus(id, text, kind = "") {
   s.textContent = text;
 }
 
+// --- view a document on this page: its pages (preview), or rebuilt from its layout ---
+const viewerState = { id: null, page: null, mode: "pages" };
+async function showDoc(id, { page = null, mode = "pages" } = {}) {
+  const hasRun = !!library[id]?.run_id;
+  if (!hasRun) mode = "pages";
+  Object.assign(viewerState, { id, page, mode });
+  for (const m of ["pages", "layout", "original"]) {
+    const b = document.getElementById(`mode-${m}`);
+    b.setAttribute("aria-pressed", String(m === mode));
+    b.disabled = m !== "pages" && !hasRun;
+  }
+  const box = document.getElementById("viewer-pages");
+  box.replaceChildren();
+  const viewer = document.getElementById("viewer");
+  viewer.dataset.docId = id;
+  viewer.hidden = false;
+  document.getElementById("ask-panel").hidden = true;   // the document takes the question panel's place
+  document.getElementById("viewer-title").textContent = docLabel(id);
+  let count;
+  if (mode === "pages") {
+    const info = await api(`/documents/${id}/preview`);
+    count = info.kind === "text" ? info.text_pages.length : info.page_count;
+    for (let n = 1; n <= count; n++) {
+      box.append(el("p", { class: "page-no", id: `view-page-${n}` }, `Page ${n}`));
+      box.append(info.kind === "text"
+        ? el("pre", {}, info.text_pages[n - 1] || "(This page has no text.)")
+        : el("img", { src: `/documents/${id}/pages/${n}`, alt: `${docLabel(id)}, page ${n}`, loading: "lazy" }));
+    }
+  } else {
+    // The Experience Center result: words, tables and figures where they are on the page;
+    // "Original text" shows what was recognised before the LLM refinement.
+    const result = await runResult(id);
+    if (viewerState.id !== id || viewerState.mode !== mode) return;  // changed meanwhile
+    count = result?.pages?.length || 0;
+    if (mode === "original") box.append(el("p", { class: "hint" }, "The text as originally recognised, before the LLM refinement."));
+    for (let n = 1; n <= count; n++) {
+      box.append(el("p", { class: "page-no", id: `view-page-${n}` }, `Page ${n}`));
+      const holder = el("div");
+      box.append(holder);
+      DocLayout.render(holder, result, n - 1, { mode: mode === "original" ? "original" : "refined" });
+    }
+    if (!count) box.append(el("p", { class: "empty" }, "No layout is available for this document."));
+  }
+  document.getElementById("viewer-meta").textContent = pages(count);
+  const target = page && document.getElementById(`view-page-${page}`);
+  if (target) target.scrollIntoView({ block: "start" });
+  else if (viewer.getBoundingClientRect().top < 0 || viewer.getBoundingClientRect().top > innerHeight / 2) {
+    viewer.scrollIntoView({ behavior: "smooth", block: "start" });   // phones: panels are stacked
+  }
+}
+for (const m of ["pages", "layout", "original"]) {
+  document.getElementById(`mode-${m}`).addEventListener("click", () => {
+    if (viewerState.id) showDoc(viewerState.id, { mode: m }).catch((err) => setStatus("upload-status", err.message, "error"));
+  });
+}
+function hideDoc() {
+  const viewer = document.getElementById("viewer");
+  viewer.hidden = true;
+  document.getElementById("ask-panel").hidden = false;
+  delete viewer.dataset.docId;
+  viewerState.id = null;
+  document.getElementById("viewer-pages").replaceChildren();
+}
+document.getElementById("viewer-close").addEventListener("click", () => {
+  hideDoc();
+});
+
+// Experience Center results (lines, layout, LLM marks), fetched once per run.
+const resultCache = {};
+async function runResult(docId) {
+  const runId = library[docId]?.run_id;
+  if (!runId) return null;
+  if (!resultCache[runId]) resultCache[runId] = api(`/api/results/${encodeURIComponent(runId)}`).catch(() => null);
+  return resultCache[runId];
+}
+
 async function deleteDoc(d, button) {
-  if (!confirm(`Remove "${docLabel(d.doc_id)}"? It is removed from DocBlendAI only; your original file is not touched.`)) return;
   button.disabled = true;
   try {
     await api(`/documents/${d.doc_id}`, { method: "DELETE" });
+    if (document.getElementById("viewer").dataset.docId === d.doc_id) hideDoc();
     setStatus("upload-status", `Removed ${docLabel(d.doc_id)}.`);
     await loadDocs();
   } catch (err) {
@@ -364,32 +418,27 @@ async function deleteDoc(d, button) {
   }
 }
 
-// --- document selection: answers use only ticked documents ---
-// Unticked ids are remembered (not ticked ones), so a newly uploaded document starts ticked.
-const EXCLUDED_KEY = "docblendai.excludedDocs";
-let currentDocs = [];
-let excluded = new Set();
-try { excluded = new Set(JSON.parse(localStorage.getItem(EXCLUDED_KEY) || "[]")); } catch { /* storage unavailable */ }
-function saveExcluded() {
-  try { localStorage.setItem(EXCLUDED_KEY, JSON.stringify([...excluded])); } catch { /* storage unavailable */ }
+// --- which documents answer questions (the checkbox on each file) ---
+// Remembered per browser as the set of UNticked files, so a new upload is ticked automatically.
+const unticked = new Set((() => { try { return JSON.parse(localStorage.getItem("docblend-unticked") || "[]"); } catch { return []; } })());
+let allDocIds = [];
+function saveTicks() { try { localStorage.setItem("docblend-unticked", JSON.stringify([...unticked])); } catch {} }
+function tickedIds() { return allDocIds.filter((id) => !unticked.has(id)); }
+function showScope() {
+  const scope = document.getElementById("ask-scope"), ticked = tickedIds();
+  if (!allDocIds.length) { scope.textContent = ""; return; }
+  if (ticked.length === allDocIds.length) {
+    scope.replaceChildren("Answering from ", el("b", {}, allDocIds.length === 1 ? "your document" : `all ${allDocIds.length} documents`),
+      ". Untick a file to leave it out.");
+  } else if (!ticked.length) {
+    scope.replaceChildren(el("b", {}, "No document ticked."), " Tick at least one file to ask about.");
+  } else {
+    scope.replaceChildren("Answering from ", el("b", {}, ticked.map(docLabel).join(", ")), ` (${ticked.length} of ${allDocIds.length}).`);
+  }
 }
-function selectedDocIds() { return currentDocs.map((d) => d.doc_id).filter((id) => !excluded.has(id)); }
-function showSelection() {
-  const n = selectedDocIds().length, total = currentDocs.length;
-  document.getElementById("docs-sub").hidden = !total;
-  document.getElementById("doc-selected").textContent =
-    n === total ? "All documents are used for answers." : n ? `${n} of ${total} used for answers.` : "None selected: tick at least one.";
-  for (const li of document.querySelectorAll("#docs li[data-id]")) li.classList.toggle("off", excluded.has(li.dataset.id));
-}
-function setAll(on) {
-  for (const d of currentDocs) on ? excluded.delete(d.doc_id) : excluded.add(d.doc_id);
-  for (const box of document.querySelectorAll("#docs input[type=checkbox]")) box.checked = on;
-  saveExcluded(); showSelection();
-}
-document.getElementById("pick-all").addEventListener("click", () => setAll(true));
-document.getElementById("pick-none").addEventListener("click", () => setAll(false));
 
-// The shared library (/documents/library): QA documents with their reading / LLM refinement state.
+// The shared library (/documents/library): the same documents as the Experience Center, with their
+// reading progress and LLM refinement. Only documents that are ready can answer questions.
 const library = {};   // doc_id -> library item (run_id, refinement, ...)
 let docsPoll = null;
 const REFINED_LABEL = { refined: "Refined by LLM", reverted: "Original text", unavailable: "Not refined: Gemini unavailable", off: "Not refined" };
@@ -397,76 +446,101 @@ const REFINED_LABEL = { refined: "Refined by LLM", reverted: "Original text", un
 async function loadDocs() {
   clearTimeout(docsPoll);
   const list = document.getElementById("docs");
-  const items = (await api("/documents/library")).filter((d) => d.doc_id);
-  for (const d of items) library[d.doc_id] = d;
-  const ready = items.filter((d) => d.qa_ready);
-  currentDocs = ready;
-  // Forget removed documents so the stored selection does not grow forever.
-  excluded = new Set([...excluded].filter((id) => ready.some((d) => d.doc_id === id)));
-  saveExcluded();
+  const docs = (await api("/documents/library")).filter((d) => d.doc_id);   // runs without a QA document stay in /studio
   list.replaceChildren();
-  document.getElementById("doc-count").textContent = items.length ? `${items.length} file${items.length === 1 ? "" : "s"}` : "";
-  showSelection();
-  if (!items.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
-  for (const d of items) list.append(docItem(d));
-  showSelection();
-  if (items.some((d) => d.status === "processing" || d.refine)) docsPoll = setTimeout(() => loadDocs().catch(() => {}), 2000);
+  document.getElementById("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
+  for (const d of docs) { library[d.doc_id] = d; docNames[d.doc_id] = d.name; }
+  allDocIds = docs.filter((d) => d.qa_ready).map((d) => d.doc_id);
+  for (const id of [...unticked]) if (!docs.some((d) => d.doc_id === id)) unticked.delete(id);   // removed files
+  saveTicks();
+  if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); showScope(); return; }
+  for (const d of docs) list.append(docRow(d));
+  showScope();
+  // Keep progress live while a document is being read or refined.
+  if (docs.some((d) => d.status === "processing" || d.refine)) docsPoll = setTimeout(() => loadDocs().catch(() => {}), 2000);
 }
 
-function docItem(d) {
+function docRow(d) {
   const name = d.name;
-  docNames[d.doc_id] = name;
-  const boxId = `use-${d.doc_id}`;
-  const box = el("input", { type: "checkbox", id: boxId, "aria-describedby": `meta-${d.doc_id}` });
-  box.checked = !excluded.has(d.doc_id);
-  box.disabled = !d.qa_ready;
-  box.addEventListener("change", () => {
-    box.checked ? excluded.delete(d.doc_id) : excluded.add(d.doc_id);
-    saveExcluded(); showSelection();
+  const ready = d.status === "ready" && d.qa_ready;
+  const viewUrl = `/documents/${d.doc_id}/view`;   // kept as a link target; clicks show the document on this page
+  const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
+  remove.addEventListener("click", (e) => { e.stopPropagation(); deleteDoc(d, remove); });
+  remove.disabled = d.status === "processing";
+  const pick = el("input", { type: "checkbox", class: "pick", title: "Use this document for answers",
+                             "aria-label": `Use ${name} for answers`, "data-id": d.doc_id });
+  pick.checked = !unticked.has(d.doc_id);
+  pick.disabled = !ready;
+  pick.addEventListener("click", (e) => e.stopPropagation());   // ticking must not open the document
+  pick.addEventListener("change", () => {
+    if (pick.checked) unticked.delete(d.doc_id); else unticked.add(d.doc_id);
+    saveTicks(); showScope();
   });
   const info = el("span", { class: "doc-info" },
-    el("label", { class: "doc-name", for: boxId, title: name }, name),
-    el("span", { class: "doc-meta", id: `meta-${d.doc_id}` },
-      [FORMAT_LABEL[d.format_type] || "Reading…", d.page_count != null ? pages(d.page_count) : null].filter(Boolean).join(" · ")));
-  const stateRow = el("span", { class: "doc-state" });
+    el("a", { class: "doc-name", href: viewUrl, title: `Open ${name}` }, name),
+    el("span", { class: "doc-meta" },
+      [FORMAT_LABEL[d.format_type] || "Reading…", d.page_count != null ? pages(d.page_count) : null].filter(Boolean).join(" · ")),
+    docState(d), docLinks(d));
+  const row = el("li", { class: ready ? "doc" : "doc processing", title: ready ? `Open ${name}` : "" },
+    pick,
+    el("a", { class: "ftype", href: viewUrl, tabindex: "-1", "aria-hidden": "true" }, typeTag(name)),
+    info,
+    el("a", { class: "view", href: viewUrl,
+              "aria-label": `View ${name}` }, "View"),
+    remove);
+  // Clicking the row, icon, name or View shows the document on this page (Remove only removes).
+  row.addEventListener("click", (e) => {
+    if (e.target.closest("button, input")) return;
+    e.preventDefault();
+    if (d.status === "processing") return;
+    showDoc(d.doc_id).catch((err) => setStatus("upload-status", err.message, "error"));
+  });
+  return row;
+}
+
+function docState(d) {
+  const row = el("span", { class: "doc-state" });
   if (d.status === "processing") {
-    const bar = el("progress", { max: "1", "aria-label": `Progress for ${name}` });
+    const bar = el("progress", { max: "1", "aria-label": `Progress for ${d.name}` });
     if (typeof d.progress === "number") bar.value = d.progress;
-    stateRow.append(bar, el("span", {}, d.message || "Reading…"));
-  } else if (d.status === "error") {
-    stateRow.append(el("span", { class: "err" }, d.error || "Reading failed."));
-  } else {
-    const ref = d.refinement || {};
-    const busy = d.refine && ["queued", "running"].includes(d.refine.status);
-    const badge = el("span", { class: `llm-badge ${busy ? "busy" : ref.status || "off"}`, title: ref.message || "" },
-      busy ? "Refining…" : REFINED_LABEL[ref.status] || "Not refined");
-    stateRow.append(badge);
-    if (busy && d.refine.message) stateRow.append(el("span", {}, d.refine.message));
-    if (ref.status === "unavailable" && !busy) stateRow.append(el("span", { title: ref.message }, ref.message.replace(/^Not refined: Gemini unavailable\.\s*/, "").slice(0, 120)));
-    if (d.qa && d.qa.status === "stale") stateRow.append(el("span", { class: "err" }, d.qa.message));
+    row.append(bar, el("span", {}, d.message || "Reading…"));
+    return row;
   }
+  if (d.status === "error") { row.append(el("span", { class: "err" }, d.error || "Reading failed.")); return row; }
+  const ref = d.refinement || {};
+  const busy = d.refine && ["queued", "running"].includes(d.refine.status);
+  if (!d.run_id && !busy) return row;   // uploaded before the pages were shared: no refinement yet
+  row.append(el("span", { class: `llm-badge ${busy ? "busy" : ref.status || "off"}`, title: ref.message || "" },
+    busy ? "Refining…" : REFINED_LABEL[ref.status] || "Not refined"));
+  if (busy && d.refine.message) row.append(el("span", {}, d.refine.message));
+  if (ref.status === "unavailable" && !busy) row.append(el("span", { title: ref.message }, ref.message.replace(/^Not refined: Gemini unavailable\.\s*/, "").slice(0, 120)));
+  if (d.qa && d.qa.status === "stale") row.append(el("span", { class: "err" }, d.qa.message));
+  return row;
+}
+
+function docLinks(d) {
   const links = el("span", { class: "doc-links" });
-  const link = (text, fn, title) => { const b = el("button", { type: "button", title: title || "" }, text); b.addEventListener("click", fn); links.append(b); return b; };
+  const link = (text, fn, title) => {
+    const b = el("button", { type: "button", title: title || "" }, text);
+    b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+    links.append(b);
+  };
   const ref = d.refinement?.status;
   if (d.status === "ready" && d.run_id) {
     if (ref === "refined") {
-      link("Show original", () => openViewer(d.doc_id, null, "original"), "The text as recognised, before the LLM refinement");
-      link("Revert to original", () => docAction(d, "revert", `Answer questions about "${name}" from its original text instead of the LLM-refined text? You can switch back.`), "Questions will be answered from the original text");
+      link("Show original", () => showDoc(d.doc_id, { mode: "original" }), "The text as recognised, before the LLM refinement");
+      link("Revert to original", () => docAction(d, "revert", `Answer questions about "${d.name}" from its original text instead of the LLM-refined text? You can switch back.`),
+        "Questions will be answered from the original text");
     }
     if (ref === "reverted") link("Use refined text", () => docAction(d, "reapply"));
     if (ref === "unavailable" || ref === "off") link("Retry", () => retryRefine(d), "Refine this document with Gemini again");
-    links.append(el("a", { href: `/studio?run=${encodeURIComponent(d.run_id)}`, title: "Page, layout, changes and versions" }, "View in Experience Center"));
+    const studio = el("a", { href: `/studio?run=${encodeURIComponent(d.run_id)}`, title: "Page, layout, LLM changes and versions" }, "View in Experience Center");
+    studio.addEventListener("click", (e) => e.stopPropagation());
+    links.append(studio);
   } else if (d.status === "ready" && !d.run_id) {
     link("Open in Experience Center", () => readForStudio(d), "Read this earlier upload with the Experience Center (layout, LLM refinement)");
   }
-  const view = el("button", { class: "remove view", type: "button", "aria-label": `View ${name}` }, "View");
-  view.addEventListener("click", () => openViewer(d.doc_id));
-  const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
-  remove.addEventListener("click", () => deleteDoc(d, remove));
-  if (d.status === "processing") remove.disabled = true;
-  info.append(stateRow, links);
-  return el("li", { "data-id": d.doc_id, class: d.status === "processing" ? "processing" : "" },
-    box, el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(name)), info, view, remove);
+  return links;
 }
 
 async function docAction(d, action, question) {
@@ -496,88 +570,6 @@ async function readForStudio(d) {
   } catch (err) { setStatus("upload-status", err.message, "error"); }
   loadDocs().catch(() => {});
 }
-
-// Experience Center results (lines, layout, LLM marks), fetched once per run.
-const resultCache = {};
-async function runResult(docId) {
-  const runId = library[docId]?.run_id;
-  if (!runId) return null;
-  if (!resultCache[runId]) resultCache[runId] = api(`/api/results/${encodeURIComponent(runId)}`).catch(() => null);
-  return resultCache[runId];
-}
-
-// --- document viewer ---
-const viewer = document.getElementById("viewer"), viewerBody = document.getElementById("viewer-body");
-const IMAGE_EXTS = ["jpg", "jpeg", "png", "tif", "tiff", "bmp", "webp"];
-function downloadNote(text, url, name) {
-  return el("p", { class: "viewer-msg" }, text, " ", el("a", { href: url, download: name }, `Download ${name}`));
-}
-const viewerState = { docId: null, page: null, mode: "file", layoutPage: 0 };
-function openViewer(docId, page, mode) {
-  Object.assign(viewerState, { docId, page: page || null, mode: mode || "file", layoutPage: page ? page - 1 : 0 });
-  const hasRun = !!library[docId]?.run_id;
-  document.getElementById("mode-layout").disabled = document.getElementById("mode-original").disabled = !hasRun;
-  if (!hasRun && viewerState.mode !== "file") viewerState.mode = "file";
-  renderViewer();
-  if (!viewer.open) viewer.showModal();
-}
-
-function renderViewer() {
-  const { docId, page, mode } = viewerState;
-  const name = docLabel(docId), ext = name.split(".").pop().toLowerCase();
-  const url = `/documents/${encodeURIComponent(docId)}/file`;
-  for (const m of ["file", "layout", "original"]) document.getElementById(`mode-${m}`).setAttribute("aria-pressed", String(m === mode));
-  document.getElementById("viewer-title").textContent = page ? `${name}, page ${page}` : name;
-  document.getElementById("viewer-open").href = ext === "pdf" && page ? `${url}#page=${page}` : url;
-  viewerBody.replaceChildren();
-  if (mode !== "file") { renderViewerLayout(); return; }
-  if (ext === "pdf") {
-    // A new iframe each time, so a different #page is honoured even for the same file.
-    viewerBody.append(el("iframe", { src: page ? `${url}#page=${page}` : url, title: name }));
-  } else if (IMAGE_EXTS.includes(ext)) {
-    const img = el("img", { src: url, alt: name });
-    img.addEventListener("error", () => img.replaceWith(downloadNote("This browser cannot show this image type.", url, name)));
-    viewerBody.append(img);
-  } else if (ext === "txt") {
-    const pre = el("pre", {}, "Loading…");
-    viewerBody.append(pre);
-    fetch(url).then((r) => { if (!r.ok) throw new Error(); return r.text(); })
-      .then((t) => { pre.textContent = t; })
-      .catch(() => { pre.textContent = "Could not load this file."; });
-  } else {
-    viewerBody.append(downloadNote("Word, PowerPoint and Excel files cannot be shown in the browser: use Layout to see their structure.", url, name));
-  }
-}
-
-async function renderViewerLayout() {
-  const { docId, mode } = viewerState;
-  viewerBody.append(el("p", { class: "viewer-msg" }, "Loading the layout…"));
-  const result = await runResult(docId);
-  if (viewerState.docId !== docId || viewerState.mode !== mode) return;  // changed meanwhile
-  viewerBody.replaceChildren();
-  if (!result) { viewerBody.append(el("p", { class: "viewer-msg" }, "No layout is available for this document.")); return; }
-  const n = result.pages?.length || 0;
-  viewerState.layoutPage = Math.min(Math.max(0, viewerState.layoutPage), Math.max(0, n - 1));
-  if (n > 1) {
-    const prev = el("button", { type: "button", "aria-label": "Previous page" }, "‹"), next = el("button", { type: "button", "aria-label": "Next page" }, "›");
-    prev.disabled = viewerState.layoutPage === 0;
-    next.disabled = viewerState.layoutPage >= n - 1;
-    prev.addEventListener("click", () => { viewerState.layoutPage--; renderViewer(); });
-    next.addEventListener("click", () => { viewerState.layoutPage++; renderViewer(); });
-    viewerBody.append(el("div", { class: "viewer-pager" }, prev, `Page ${viewerState.layoutPage + 1} of ${n}`, next));
-  }
-  if (mode === "original") viewerBody.append(el("p", { class: "viewer-msg" }, "The text as originally recognised, before the LLM refinement."));
-  const holder = el("div");
-  viewerBody.append(holder);
-  DocLayout.render(holder, result, viewerState.layoutPage, { mode: mode === "original" ? "original" : "refined" });
-}
-for (const m of ["file", "layout", "original"]) {
-  document.getElementById(`mode-${m}`).addEventListener("click", () => { viewerState.mode = m; renderViewer(); });
-}
-document.getElementById("viewer-close").addEventListener("click", () => viewer.close());
-viewer.addEventListener("click", (e) => { if (e.target === viewer) viewer.close(); });  // click on the backdrop
-// The close event fires asynchronously: do not wipe a document reopened in the meantime.
-viewer.addEventListener("close", () => { if (!viewer.open) viewerBody.replaceChildren(); });
 
 // --- upload: click or drag a file onto the drop zone ---
 const fileInput = document.getElementById("file"), drop = document.getElementById("drop");
@@ -631,15 +623,16 @@ document.getElementById("upload-form").addEventListener("submit", async (e) => {
 
 // --- ask ---
 function sourceView(s) {
-  const where = [docLabel(s.doc_id), s.page ? `page ${s.page}` : null].filter(Boolean).join(", ");
+  const lines = s.first_line ? (s.last_line && s.last_line !== s.first_line ? `lines ${s.first_line}–${s.last_line}` : `line ${s.first_line}`) : null;
+  const where = [docLabel(s.doc_id), s.page ? `page ${s.page}` : null, lines].filter(Boolean).join(", ");
   const pct = (v) => `${Math.round(v * 100)}%`;
-  const open = el("button", { type: "button", title: "Open the document here" }, where);
-  open.addEventListener("click", () => openViewer(s.doc_id, s.page));
+  const open = el("button", { type: "button", title: "Show this page of the document" }, where);
+  open.addEventListener("click", () => showDoc(s.doc_id, { page: s.page }).catch((err) => setStatus("ask-status", err.message, "error")));
   const quote = el("blockquote", {}, s.text);
   // Mark the LLM's corrections in the passage (hover a word for the original text).
   runResult(s.doc_id).then((result) => {
-    const lines = (result?.pages || []).flatMap((p) => p.lines || []);
-    if (lines.some(DocLayout.isLlmLine)) quote.replaceChildren(DocLayout.highlightText(s.text, lines));
+    const all = (result?.pages || []).flatMap((p) => p.lines || []);
+    if (all.some(DocLayout.isLlmLine)) quote.replaceChildren(DocLayout.highlightText(s.text, all));
   });
   return el("div", { class: "source" },
     el("div", { class: "where" }, open, " ",
@@ -678,20 +671,18 @@ document.getElementById("ask-form").addEventListener("submit", async (e) => {
   const text = question.value.trim();
   if (!text) return;
   didYouMean.hidden = true; suggestionRun++;
-  const docIds = selectedDocIds();
-  if (currentDocs.length && !docIds.length) {
-    setStatus("ask-status", "No documents are selected. Tick at least one document on the left (or press All).", "error");
-    return;
-  }
+  const ticked = tickedIds();
+  if (allDocIds.length && !ticked.length) { setStatus("ask-status", "Tick at least one document to answer from.", "error"); return; }
+  // Only send a selection when some files are left out; otherwise every document is searched.
+  const scope = ticked.length < allDocIds.length ? "?" + ticked.map((id) => `doc_id=${encodeURIComponent(id)}`).join("&") : "";
   const btn = document.getElementById("ask-btn");
   btn.disabled = true; btn.textContent = "Thinking…";
   setStatus("ask-status", "");
-  const filter = currentDocs.length ? docIds : null;
-  checkSpelling(text, filter);
+  checkSpelling(text, ticked.length < allDocIds.length ? ticked : null);
   try {
-    const answer = await api("/ask", {
+    const answer = await api(`/ask${scope}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query_id: crypto.randomUUID(), question_text: text, user_id: "web", doc_ids: filter }),
+      body: JSON.stringify({ query_id: crypto.randomUUID(), question_text: text, user_id: "web" }),
     });
     const sources = await api(`/answer/${answer.answer_id}/sources`);
     const label = answer.reliability_label;
@@ -714,12 +705,11 @@ document.getElementById("ask-form").addEventListener("submit", async (e) => {
 
 loadDocs().then(() => {
   const only = new URLSearchParams(location.search).get("doc");
-  if (only && currentDocs.some((d) => d.doc_id === only)) {
-    excluded = new Set(currentDocs.map((d) => d.doc_id).filter((id) => id !== only));
-    saveExcluded();
-    for (const box of document.querySelectorAll("#docs input[type=checkbox]")) box.checked = !excluded.has(box.id.slice(4));
-    showSelection();
-    setStatus("ask-status", `Asking about ${docLabel(only)} only. Tick other documents to include them.`);
+  if (only && allDocIds.includes(only)) {
+    for (const id of allDocIds) if (id !== only) unticked.add(id); else unticked.delete(id);
+    saveTicks();
+    for (const box of document.querySelectorAll("#docs input.pick")) box.checked = !unticked.has(box.dataset.id);
+    showScope();
     question.focus();
   }
 }).catch((err) => setStatus("upload-status", err.message, "error"));

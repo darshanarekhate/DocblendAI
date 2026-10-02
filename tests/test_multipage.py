@@ -79,7 +79,7 @@ def test_docx_upload_reports_its_pages(client, tmp_path) -> None:
 
 def test_chunk_pages_numbered_gives_one_based_pages() -> None:
     numbered = chunker.chunk_pages_numbered("d", [("first page", 1.0), ("", 1.0), ("third page", 1.0)])
-    assert [(page, c.chunk_id) for page, c in numbered] == [(1, "d:0"), (3, "d:1")]
+    assert [(loc.page, c.chunk_id) for loc, c in numbered] == [(1, "d:0"), (3, "d:1")]
 
 
 def test_sources_cite_the_page_the_answer_came_from(client, pdf_file, fake_llm) -> None:
@@ -201,3 +201,63 @@ def test_retrieval_with_fewer_distinct_chunks_than_top_k(fake_embeddings, chroma
         _store(f"copy{copy}", ["only one passage about paging"])
     hits = retrieval.retrieve(Query(query_id="q", question_text="paging", user_id="u"), top_k=5)
     assert len(hits) == 1
+
+
+# --- line references ------------------------------------------------------------------------
+
+
+def test_chunk_line_ranges_skip_blank_lines() -> None:
+    page = "Heading\n\n  Indented second line\nThird line"
+    [(loc, chunk)] = chunker.chunk_pages_numbered("d", [(page, 1.0)])
+    assert (loc.page, loc.first_line, loc.last_line) == (1, 1, 3)
+
+
+def test_long_page_chunks_cover_increasing_line_ranges() -> None:
+    # Every word is unique ("L7w3" = line 7, word 3), so each chunk's true first/last line is known.
+    page = "\n".join(" ".join(f"L{n}w{k}" for k in range(12)) for n in range(1, 31))
+    numbered = chunker.chunk_pages_numbered("d", [(page, 1.0)], chunk_size=150, overlap=40)
+    assert len(numbered) > 5
+    for loc, chunk in numbered:
+        words = chunk.text.split()
+        assert loc.first_line == int(words[0][1:].split("w")[0])
+        assert loc.last_line == int(words[-1][1:].split("w")[0])
+
+
+def test_sources_cite_page_and_lines(client, pdf_file, fake_llm) -> None:
+    _upload(client, pdf_file(["Intro line\nLexical analysis converts characters into tokens.\nMore text"]))
+    body = {"query_id": "q-lines", "question_text": "What does lexical analysis convert?", "user_id": "u"}
+    answer = client.post("/ask", json=body).json()
+    [source] = client.get(f"/answer/{answer['answer_id']}/sources").json()
+    assert (source["page"], source["first_line"], source["last_line"]) == (1, 1, 3)
+
+
+# --- a large typed document must not crowd out the relevant, less legible one ----------------
+
+
+def test_best_match_in_a_poorly_read_document_is_not_crowded_out(fake_embeddings, chroma) -> None:
+    """The failure seen with real notes: five loosely related typed passages (confidence 1.0)
+    outscored the handwritten page that matched the question best (confidence 0.4)."""
+    # Similarities (fake embeddings): notes 0.775, each typed passage 0.722, so all are within
+    # the relevance margin, yet every typed passage has the higher combined_score (0.81 vs 0.66).
+    question = "markov models advantages effective easy implement"
+    typed = [f"markov models advantages effective easy report chapter{c} charts" for c in "abdefgh"]
+    _store_with_conf("typed", typed, 1.0)
+    _store_with_conf("notes", ["markov models advantages effective easy implement pocono economy materials workers"], 0.4)
+
+    hits = retrieval.retrieve(Query(query_id="q", question_text=question, user_id="u"), top_k=5)
+
+    assert "notes:0" in [chunk.chunk_id for chunk, _ in hits]
+    scores = [r.combined_score for _, r in hits]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_one_relevant_document_still_fills_every_slot(fake_embeddings, chroma) -> None:
+    _store_with_conf("typed", [f"data visualization chart type {n}" for n in range(8)], 1.0)
+    _store_with_conf("other", ["photosynthesis in green plants"], 1.0)
+    hits = retrieval.retrieve(Query(query_id="q", question_text="data visualization chart", user_id="u"), top_k=5)
+    assert len(hits) == 5 and all(chunk.chunk_id.startswith("typed:") for chunk, _ in hits)
+
+
+def _store_with_conf(doc_id: str, texts: list[str], conf: float) -> None:
+    chunks = [RecognizedChunk(chunk_id=f"{doc_id}:{i}", text=t, raw_conf=conf, calibrated_conf=conf) for i, t in enumerate(texts)]
+    vector_store.add_chunks(doc_id, embedder.embed_chunks(chunks))

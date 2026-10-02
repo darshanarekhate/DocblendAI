@@ -65,7 +65,18 @@ def _mean_conf(pages: list[tuple[str, float]]) -> float:
 
 
 def detect_format(file_path: str) -> FormatType:
+    """Classify the document as typed, scanned (printed), or handwritten (see _detect)."""
+    return _detect(file_path)[0]
+
+
+Pages = list[tuple[str, float]]
+
+
+def _detect(file_path: str) -> tuple[FormatType, Pages]:
     """Classify the document as typed, scanned (printed), or handwritten.
+
+    Also returns the sample pages already read with the winning engine (the
+    first ones of the document), so extraction does not read them a second time.
 
     Word/PowerPoint/text files are typed. A PDF with a text layer is typed.
     Otherwise (other PDFs, images) the first OCR_SAMPLE_PAGES are
@@ -84,38 +95,48 @@ def detect_format(file_path: str) -> FormatType:
     htr_extractor.HTRUnavailableError if HTR is needed but cannot load.
     """
     if kind_of(file_path) in TEXT_KINDS or has_text_layer(file_path):
-        return FormatType.TYPED
+        return FormatType.TYPED, []
 
-    ocr_conf = confidence_capture.calibrate(
-        _mean_conf(ocr_extractor.ocr_file(file_path, max_pages=OCR_SAMPLE_PAGES)), FormatType.SCANNED
-    )
+    ocr_pages = ocr_extractor.ocr_file(file_path, max_pages=OCR_SAMPLE_PAGES)
+    ocr_conf = confidence_capture.calibrate(_mean_conf(ocr_pages), FormatType.SCANNED)
     if ocr_conf >= settings.scanned_min_ocr_conf:
-        return FormatType.SCANNED
+        return FormatType.SCANNED, ocr_pages
 
-    htr_conf = confidence_capture.calibrate(
-        _mean_conf(htr_extractor.htr_file(file_path, max_pages=OCR_SAMPLE_PAGES)), FormatType.HANDWRITTEN
-    )
-    return FormatType.HANDWRITTEN if htr_conf > ocr_conf else FormatType.SCANNED
+    htr_pages = htr_extractor.htr_file(file_path, max_pages=OCR_SAMPLE_PAGES)
+    htr_conf = confidence_capture.calibrate(_mean_conf(htr_pages), FormatType.HANDWRITTEN)
+    if htr_conf > ocr_conf:
+        return FormatType.HANDWRITTEN, htr_pages
+    return FormatType.SCANNED, ocr_pages
 
 
-def resolve_format(file_path: str, hint: FormatType | None) -> FormatType:
+def resolve(file_path: str, hint: FormatType | None) -> tuple[FormatType, Pages]:
     """The user's format hint if it can apply, else automatic detection.
 
     Word/PowerPoint/text files are always typed (there is nothing to OCR), and
     an image can never be typed (it has no text layer), so those hints are ignored.
+    Returns the format and the pages detection already read with that format's
+    engine (empty when the hint was used); pass them on to extract().
     """
     kind = kind_of(file_path)
     if kind in TEXT_KINDS:
-        return FormatType.TYPED
+        return FormatType.TYPED, []
     if hint is None or (kind is FileKind.IMAGE and hint is FormatType.TYPED):
-        return detect_format(file_path)
-    return hint
+        return _detect(file_path)
+    return hint, []
 
 
-def extract(document: Document) -> list[tuple[str, float]]:
-    """Dispatch to the right extractor. Returns (page_text, raw_conf) per page."""
+def resolve_format(file_path: str, hint: FormatType | None) -> FormatType:
+    return resolve(file_path, hint)[0]
+
+
+def extract(document: Document, already_read: Pages = ()) -> Pages:
+    """Dispatch to the right extractor. Returns (page_text, raw_conf) per page.
+
+    already_read: the document's first pages as detection read them with this
+    format's engine; only the pages after them are read here.
+    """
     if document.format_type is FormatType.TYPED:
         return text_parser.parse(document.file_path)
-    if document.format_type is FormatType.SCANNED:
-        return ocr_extractor.ocr_file(document.file_path)
-    return htr_extractor.htr_file(document.file_path)
+    read = ocr_extractor.ocr_file if document.format_type is FormatType.SCANNED else htr_extractor.htr_file
+    done = list(already_read)
+    return done + read(document.file_path, first_page=len(done))

@@ -12,7 +12,9 @@ same lines /studio shows (including reviewed and LLM-refined text):
   figure/chart/image blocks -> image, everything else -> paragraph), otherwise the rule-based
   content_type.classify on each chunk.
 
-index_document embeds the chunks and replaces the document's chunks in ChromaDB.
+Each chunk keeps its citation (chunker.Location: page and range of the page's non-empty lines,
+counted across the page's segments in reading order). index_document embeds the chunks and
+replaces the document's chunks in ChromaDB.
 
 Uses from schemas.py: ContentType, RecognizedChunk.
 """
@@ -20,11 +22,14 @@ Uses from schemas.py: ContentType, RecognizedChunk.
 from __future__ import annotations
 
 import logging
+import re
+from bisect import bisect_right
 from dataclasses import dataclass
 from typing import Any
 
 from app.models.schemas import ContentType, RecognizedChunk
 from app.modules import chunker, content_type, embedder, spelling, vector_store
+from app.modules.chunker import Location
 from app.modules.reliability import LLM_SOURCES, LLM_TEXT_MAX_CONF
 from app.modules.text_parser import CELL_SEPARATOR
 
@@ -150,19 +155,27 @@ def segments(result: dict[str, Any]) -> list[Segment]:
     return out
 
 
-def build_chunks(doc_id: str, result: dict[str, Any]) -> list[tuple[int, RecognizedChunk]]:
-    """(1-based page, chunk) pairs with raw/calibrated confidence and content type set (not embedded)."""
-    out: list[tuple[int, RecognizedChunk]] = []
+_LINE_START = re.compile(r"^[^\S\n]*\S", re.MULTILINE)  # a non-empty line (as chunker counts them)
+
+
+def build_chunks(doc_id: str, result: dict[str, Any]) -> list[tuple[Location, RecognizedChunk]]:
+    """(citation, chunk) pairs with raw/calibrated confidence and content type set (not embedded)."""
+    out: list[tuple[Location, RecognizedChunk]] = []
+    lines_before: dict[int, int] = {}  # page -> non-empty lines in its earlier segments
     for seg in segments(result):
-        for text in chunker._split(seg.text, CHUNK_SIZE, CHUNK_OVERLAP):
+        line_starts = [m.start() for m in _LINE_START.finditer(seg.text)]
+        offset = lines_before.get(seg.page_no, 0)
+        for text, first, last in chunker._split(seg.text, CHUNK_SIZE, CHUNK_OVERLAP):
             if not text.strip():
                 continue
+            location = Location(seg.page_no, offset + bisect_right(line_starts, first), offset + bisect_right(line_starts, last))
             chunk = RecognizedChunk(
                 chunk_id=f"{doc_id}:{len(out)}", text=text, raw_conf=round(seg.raw_conf, 6),
                 calibrated_conf=round(seg.calibrated_conf, 6),
                 content_type=seg.content_type or content_type.classify(text),
             )
-            out.append((seg.page_no, chunk))
+            out.append((location, chunk))
+        lines_before[seg.page_no] = offset + len(line_starts)
     return out
 
 
@@ -180,7 +193,7 @@ def index_document(doc_id: str, result: dict[str, Any]) -> list[RecognizedChunk]
         raise NoTextError("No readable text found in this file")
     chunks = embedder.embed_chunks([c for _, c in numbered])
     vector_store.delete_document(doc_id)
-    vector_store.add_chunks(doc_id, chunks, {c.chunk_id: page for (page, _), c in zip(numbered, chunks)})
+    vector_store.add_chunks(doc_id, chunks, {c.chunk_id: loc for (loc, _), c in zip(numbered, chunks)})
     spelling.invalidate()
     logger.info("Indexed %s: %d chunks", doc_id, len(chunks))
     return chunks

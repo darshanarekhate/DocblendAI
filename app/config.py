@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     similarity_weight: float = 0.7
     # Re-ranking pool: fetch top_k * this many by similarity, then re-sort by combined_score.
     candidate_multiplier: int = 3
+    # Chunks whose similarity is within this of the best match count as relevant, and relevant
+    # documents share the top_k slots (see retrieval.py), so a large clearly-typed document
+    # cannot crowd out a less legible one that matches the question better.
+    relevance_margin: float = 0.05
 
     # PaddleOCR Experience Center (/studio, /api/*). CPU-speed defaults: PP-OCRv5 mobile models,
     # no orientation/unwarping, PDFs at ~150 DPI, every model loaded once and reused.
@@ -91,6 +95,9 @@ class Settings(BaseSettings):
     # Erase notebook rules and margin lines (OpenCV) before finding lines: ruled paper otherwise
     # looks like one full-width line of ink per rule.
     remove_ruled_lines: bool = True
+    # Whiten show-through from the back of the sheet and leftover rule traces before finding
+    # lines (see line_segmentation.whiten_background).
+    whiten_background: bool = True
     # Temperature scaling of TrOCR token probabilities (Ayllon et al., ICDAR 2024: raw HTR
     # confidence is overconfident). 1.0 = off; fit with `python -m evaluation.fit_htr_temperature`.
     htr_temperature: float = 1.0
@@ -98,6 +105,9 @@ class Settings(BaseSettings):
     # (Tesseract when installed, otherwise docTR).
     ocr_engine: str = "auto"
     calibration_file: Path = DATA_DIR / "calibration.json"
+    # Load the OCR/HTR models in the background when the server starts, so the first
+    # scanned or handwritten upload does not wait ~15 s for them.
+    preload_models: bool = True
 
     database_url: str = f"sqlite:///{(DATA_DIR / 'docblendai.db').as_posix()}"
     chroma_dir: Path = DATA_DIR / "chroma_db"

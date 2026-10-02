@@ -4,12 +4,37 @@ What changed in DocBlendAI, newest first. The baseline is the original `main` co
 ("DocBlendAI: confidence-aware QA over typed, scanned and handwritten documents"); everything
 below is on the branch `feature/experience-center` (`git log b0030d4..HEAD`).
 
-Test counts are from `venv/Scripts/python -m pytest`: 193 tests at `b0030d4`, **403** now
-(210 new, all offline: PaddleOCR, TrOCR, docTR, Tesseract and Gemini are faked).
+Test counts are from `venv/Scripts/python -m pytest`: 193 tests at `b0030d4`, **438** now
+(245 new incl. main's, all offline: PaddleOCR, TrOCR, docTR, Tesseract and Gemini are faked).
 
 ---
 
 ## [Unreleased] — `feature/experience-center` (2026-10-01 to 2026-10-02)
+
+### Merged with `main` (the team's 31 commits up to `e9f4a79`)
+
+`main` gained, in parallel: a chat with follow-up questions (`POST /chat`), an in-page document
+preview (`GET /documents/{id}/preview`, `/pages/{n}`, `/view`), page-and-line citations
+(`chunker.Location`, `vector_store.get_locations`), retrieval that shares slots between relevant
+documents (`RELEVANCE_MARGIN`), its own document checkboxes (`/ask?doc_id=...`), faster scanned /
+handwritten uploads (detection pages reused, models warmed up at start: `PRELOAD_MODELS`), notebook
+handwriting fixes (`WHITEN_BACKGROUND`, TrOCR base/large tokenizer), and a redesigned QA page.
+How the two lines of work were combined:
+
+- **QA page**: main's design and in-page preview, plus this branch's shared library list, reading
+  progress, LLM badge and links, Layout / Original-text view modes, "Did you mean", sources that
+  open the cited page, and `?doc=`.
+- **Document filter**: `/ask` accepts both `doc_ids` in the body and main's `?doc_id=` parameters
+  (unknown ids: 404; an empty body list means all documents); `/chat` keeps main's rule that an
+  empty selection answers from no document; `vector_store.search(..., [])` finds nothing.
+- **Citations**: the QA index (`qa_index.py`) stores main's page + line range for every chunk,
+  including chunks built from PaddleOCR / PP-StructureV3 blocks.
+- **Extraction**: the classic engine path reuses detection's pages (main's speed-up); the Paddle +
+  TrOCR handwriting path applies main's `whiten_background` before reading each line box.
+- **Start-up warm-up**: TrOCR is preloaded; docTR only with the classic engine (PaddleOCR finds
+  the lines otherwise), which saves memory.
+- Tests: 438 (403 from this branch, 35 from main: `test_chat.py`, `test_preview.py`,
+  `test_selection.py` and additions to existing files).
 
 ### Docker for other computers
 

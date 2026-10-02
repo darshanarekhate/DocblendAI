@@ -100,7 +100,7 @@ What changed and where: `CHANGELOG.md` (add an entry when you add a feature).
 
 ## Tests and evaluation
 
-- `venv/Scripts/python -m pytest`: 403 offline unit/API tests (~1 minute). Tesseract, TrOCR, docTR, PaddleOCR, embeddings and Gemini are faked, so no key or network is needed. Guards in `tests/conftest.py` fail any test that tries to load a real TrOCR, docTR or Paddle model; uploads use the classic engines (faked) and LLM refinement is off unless a test turns it on.
+- `venv/Scripts/python -m pytest`: 438 offline unit/API tests (~1 minute). Tesseract, TrOCR, docTR, PaddleOCR, embeddings and Gemini are faked, so no key or network is needed. Guards in `tests/conftest.py` fail any test that tries to load a real TrOCR, docTR or Paddle model; uploads use the classic engines (faked) and LLM refinement is off unless a test turns it on.
   - One area at a time: `venv/Scripts/python -m pytest tests/test_refine.py` (LLM refinement, shared documents), `tests/test_paddleocr_api.py` / `test_paddleocr_service.py` (Experience Center engine and API), `tests/test_calibration.py`, `tests/test_studio_tools_api.py` (exports, preprocessing, plugins), `tests/test_doc_filter.py`, `test_spelling.py`, `test_document_file.py` (QA page features).
   - Fakes to reuse: `tests/paddle_fakes.py` (Paddle models from recorded real results in `tests/fixtures/`), `tests/refine_fakes.py` (`FakeGemini` for the `refine` plugin), `fake_embed` / `fake_ocr` / `fake_htr` in `tests/conftest.py`.
 - PaddleOCR calibration with the real engine (~3 minutes): `venv/Scripts/python -m app.calibration.calibrate` (writes `data/paddle_calibration/`, git-ignored).

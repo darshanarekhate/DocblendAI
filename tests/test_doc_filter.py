@@ -52,12 +52,14 @@ def test_vector_store_search_only_returns_selected_documents(chroma) -> None:
     assert {c.chunk_id for c, _ in vector_store.search(query_vector, 10, ["db", "os"])} == {"os:0", "db:0"}
 
 
-def test_empty_filter_means_all_documents(chroma) -> None:
+def test_no_filter_means_all_documents_and_empty_finds_nothing(chroma) -> None:
+    # vector_store: None = all documents, [] = none selected (main's /chat sends what is ticked).
+    # /ask treats an empty doc_ids body as "all" before it gets here (test_ask_without_doc_ids_still_uses_all_documents).
     _store("os", OS_PAGE)
     _store("db", DB_PAGE)
     [query_vector] = fake_embed(["anything"], "")
-    assert len(vector_store.search(query_vector, 10, [])) == 2
     assert len(vector_store.search(query_vector, 10, None)) == 2
+    assert vector_store.search(query_vector, 10, []) == []
 
 
 def test_get_texts_by_document(chroma) -> None:

@@ -14,6 +14,7 @@ from chromadb.api.models.Collection import Collection
 
 from app.config import settings
 from app.models.schemas import ContentType, RecognizedChunk
+from app.modules.chunker import Location
 
 COLLECTION = "chunks"
 
@@ -32,10 +33,10 @@ def _get() -> Collection:
     return _collection(str(settings.chroma_dir))
 
 
-def add_chunks(doc_id: str, chunks: list[RecognizedChunk], pages: dict[str, int] | None = None) -> None:
+def add_chunks(doc_id: str, chunks: list[RecognizedChunk], locations: dict[str, Location] | None = None) -> None:
     """Upsert embedded chunks for one document (same chunk_id replaces, not duplicates).
 
-    pages maps chunk_id -> 1-based page number, stored as metadata for source citations.
+    locations maps chunk_id -> page and line range, stored as metadata for source citations.
     """
     if not chunks:
         return
@@ -47,8 +48,9 @@ def add_chunks(doc_id: str, chunks: list[RecognizedChunk], pages: dict[str, int]
         meta = {"doc_id": doc_id, "content_type": c.content_type.value, "raw_conf": c.raw_conf}
         if c.calibrated_conf is not None:  # Chroma metadata cannot hold None
             meta["calibrated_conf"] = c.calibrated_conf
-        if pages and c.chunk_id in pages:
-            meta["page"] = pages[c.chunk_id]
+        if locations and c.chunk_id in locations:
+            loc = locations[c.chunk_id]
+            meta.update(page=loc.page, first_line=loc.first_line, last_line=loc.last_line)
         metadatas.append(meta)
 
     _get().upsert(
@@ -69,12 +71,14 @@ def search(
 ) -> list[tuple[RecognizedChunk, float]]:
     """Return the top_k nearest chunks with cosine similarity (1 = identical), best first.
 
-    doc_ids limits the search to those documents (None or empty = all documents).
+    doc_ids: search only these documents (None = all). An empty list finds nothing.
     """
+    if doc_ids is not None and not doc_ids:
+        return []
     res = _get().query(
         query_embeddings=[query_vector],
         n_results=top_k,
-        where=_where(doc_ids),
+        where={"doc_id": {"$in": list(doc_ids)}} if doc_ids is not None else None,
         include=["documents", "metadatas", "distances", "embeddings"],
     )
     results = []
@@ -110,12 +114,20 @@ def get_chunks(chunk_ids: list[str]) -> dict[str, RecognizedChunk]:
     }
 
 
-def get_pages(chunk_ids: list[str]) -> dict[str, int]:
-    """1-based page number of each stored chunk. Chunks stored before pages were recorded are left out."""
+def get_locations(chunk_ids: list[str]) -> dict[str, dict[str, int | None]]:
+    """Page and line range of each stored chunk: {"page", "first_line", "last_line"}.
+
+    Chunks stored before locations were recorded are left out; chunks stored
+    before line numbers were recorded have first_line/last_line None.
+    """
     if not chunk_ids:
         return {}
     res = _get().get(ids=chunk_ids, include=["metadatas"])
-    return {cid: int(meta["page"]) for cid, meta in zip(res["ids"], res["metadatas"]) if "page" in meta}
+    return {
+        cid: {"page": meta["page"], "first_line": meta.get("first_line"), "last_line": meta.get("last_line")}
+        for cid, meta in zip(res["ids"], res["metadatas"])
+        if "page" in meta
+    }
 
 
 def get_texts(doc_ids: list[str] | None = None) -> list[str]:

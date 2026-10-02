@@ -6,25 +6,58 @@ are wired together through the routers.
 Run with:  venv/Scripts/python -m uvicorn app.main:app --reload
 """
 
+import logging
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db.database import init_db
 from app.logging_config import configure_logging
-from app.routers import paddleocr, query, refine, studio_tools, upload
+from app.routers import paddleocr, preview, query, refine, studio_tools, upload
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 # Uvicorn only configures its own loggers; this makes app.* INFO logs visible too
 # (LOG_FORMAT=json switches to one JSON object per line).
 configure_logging(settings.log_format)
+logger = logging.getLogger(__name__)
+
+
+def _warm_up_models() -> None:
+    """Load (and run once) the models a scanned or handwritten upload needs.
+
+    Loading TrOCR and docTR takes ~15 s and their first run is slower than later
+    ones; doing both at startup, off the request path, keeps that out of uploads.
+    A model that cannot load is simply loaded (and reported) on first use instead.
+    With the PaddleOCR engine (document_extract.py) only TrOCR is needed up front:
+    docTR finds handwritten lines and reads print only for the classic engine.
+    """
+    from PIL import Image
+
+    from app.modules import htr_extractor, line_segmentation, ocr_extractor
+    from app.modules.document_extract import engine_mode
+
+    blank_line, blank_page = Image.new("L", (384, 64), 255), Image.new("L", (850, 1100), 255)
+    steps = [("HTR model", lambda: htr_extractor.recognize_lines([blank_line]))]
+    if engine_mode() == "classic":
+        if settings.htr_segmenter == "doctr":
+            steps.append(("line detector", lambda: line_segmentation.detect_lines(blank_page)))
+        if ocr_extractor._engine() == "doctr":
+            steps.append(("docTR OCR", lambda: ocr_extractor.ocr_image(blank_page)))
+    for name, step in steps:
+        try:
+            step()
+        except Exception as e:  # noqa: BLE001 - a warm-up failure must never stop the server
+            logger.warning("Could not preload %s: %s", name, e)
+    logger.info("OCR/HTR models loaded")
 
 
 @asynccontextmanager
@@ -32,6 +65,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     settings.chroma_dir.mkdir(parents=True, exist_ok=True)
     init_db()
+    if settings.preload_models:
+        threading.Thread(target=_warm_up_models, name="model-warm-up", daemon=True).start()
     yield
 
 
@@ -42,12 +77,24 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# The UI is normally served at "/", but people also open app/static/index.html directly
+# (double-click: origin "null") or through an editor's live preview on another localhost
+# port. Let those local pages call the API; nothing outside this machine is allowed.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["null"],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(upload.router)
 app.include_router(query.router)
+app.include_router(preview.router)
 app.include_router(paddleocr.router)
 app.include_router(studio_tools.router)
 app.include_router(refine.router)
-# Experience Center assets (studio.css/js, sample images) and the QA page's shared files.
+# Experience Center assets (studio.css/js, sample images) and the files both pages share (layout.js/css).
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -56,13 +103,17 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# no-cache: browsers re-check the pages on every visit, so UI changes show without Ctrl+F5.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
 @app.get("/", include_in_schema=False)
 def frontend() -> FileResponse:
     """Demo UI: upload documents, ask questions, see reliability labels and sources."""
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers=NO_CACHE)
 
 
 @app.get("/studio", include_in_schema=False)
 def studio() -> FileResponse:
     """Experience Center: OCR / document parsing with calibrated confidence, side by side."""
-    return FileResponse(STATIC_DIR / "studio.html")
+    return FileResponse(STATIC_DIR / "studio.html", headers=NO_CACHE)

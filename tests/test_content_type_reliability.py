@@ -105,7 +105,7 @@ def test_module5_retrieve_reranks_a_wider_candidate_pool(chroma, fake_embeddings
     monkeypatch.setattr(retrieval.settings, "candidate_multiplier", 3)
     calls = []
     original = vector_store.search
-    monkeypatch.setattr(vector_store, "search", lambda vec, k, doc_ids=None: calls.append(k) or original(vec, k, doc_ids))
+    monkeypatch.setattr(vector_store, "search", lambda vec, k, *rest: calls.append(k) or original(vec, k, *rest))
 
     retrieval.retrieve(Query(query_id="q", question_text="anything", user_id="u"), top_k=4)
 
