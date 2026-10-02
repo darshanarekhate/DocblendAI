@@ -362,3 +362,16 @@ def test_find_lines_whitens_background(monkeypatch) -> None:
     monkeypatch.setattr(line_segmentation, "whiten_background", lambda page: seen.append(1) or page)
     htr_extractor.find_lines(_ruled_page([3]))
     assert seen == [1]
+
+
+def test_detect_lines_drops_rule_traces_but_keeps_writing(monkeypatch) -> None:
+    words = np.array([[0.1, 0.10, 0.5, 0.14, 0.9]])  # one line, y 100-140 on a 1000 px page
+    monkeypatch.setattr(line_segmentation, "_detector", lambda: lambda pages: [{"words": words}])
+    page = Image.new("L", (1000, 1000), 255)
+    draw = ImageDraw.Draw(page)
+    draw.rectangle((120, 105, 160, 130), fill=0)  # a letter
+    draw.line((100, 136, 500, 136), fill=0, width=3)  # a leftover rule trace just under the writing
+    [crop] = line_segmentation.detect_lines(page)
+    ink = np.asarray(crop) < 128
+    assert ink.any()  # the letter survives
+    assert not ink[:, -50:].any()  # the rule's long tail beyond the letter is gone

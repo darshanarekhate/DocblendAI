@@ -42,7 +42,14 @@ SAME_LINE_OVERLAP = 0.5
 MAX_WORD_GAP = 4.0
 LINE_PAD = 0.25  # padding around each line crop, as a share of the line height
 MIN_WORD_SCORE = 0.3  # drop detections the model itself doubts (specks, paper texture)
-WORD_PAD = 0.15  # padding kept around each word inside a line crop, as a share of the word height
+# Inside a line crop, an ink shape is kept only if its centre lies within the line's band
+# (median word top..bottom) widened by this share of the line height; shapes centred outside
+# are pieces of the lines above or below.
+BAND_SLACK = 0.15
+# A shape wider than this many line heights and thinner than RULE_MAX_HEIGHT line heights is a
+# leftover notebook rule or an underline, not writing.
+RULE_MIN_WIDTH = 2.5
+RULE_MAX_HEIGHT = 0.25
 # whiten_background: pixels lighter than ink_core + WHITEN_MIX * (otsu - ink_core) become paper.
 WHITEN_MIX = 0.5
 
@@ -190,18 +197,38 @@ def detect_lines(page: Image.Image) -> list[Image.Image]:
     boxes = [
         (x0 * w, y0 * h, x1 * w, y1 * h) for x0, y0, x1, y1, score in np.asarray(words).tolist() if score >= MIN_WORD_SCORE
     ]
-    gray = page.convert("L")
-    crops = []
-    for words_in_line in group_words(boxes):
-        left, top, right, bottom = _union(words_in_line)
-        pad = LINE_PAD * (bottom - top)
-        box = (max(0, int(left - pad)), max(0, int(top - pad)), min(w, int(right + pad)), min(h, int(bottom + pad)))
-        # Keep only this line's own words; the padding would otherwise bring in the tops and
-        # bottoms of the lines above and below, and TrOCR reads those fragments as text.
-        crop = Image.new("L", (box[2] - box[0], box[3] - box[1]), 255)
-        for wl, wt, wr, wb in words_in_line:
-            wp = WORD_PAD * (wb - wt)
-            word = (max(box[0], int(wl - wp)), max(box[1], int(wt - wp)), min(box[2], int(wr + wp)), min(box[3], int(wb + wp)))
-            crop.paste(gray.crop(word), (word[0] - box[0], word[1] - box[1]))
-        crops.append(crop)
-    return crops
+    import cv2
+
+    gray = np.asarray(page.convert("L"))
+    otsu, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return [_line_crop(gray, otsu, words_in_line) for words_in_line in group_words(boxes)]
+
+
+def _line_crop(gray: np.ndarray, otsu: float, words_in_line: list[Box]) -> Image.Image:
+    """One line's image with everything that is not this line's writing whitened.
+
+    docTR's word boxes on dense handwriting reach into the neighbouring lines, so cropping
+    (even word by word) brings in the tops and bottoms of the lines above and below, plus
+    rule and underline traces; TrOCR reads all of that as invented words. Each connected ink
+    shape is kept only if its centre is inside this line's band and it is not rule-like.
+    """
+    import cv2
+
+    h, w = gray.shape
+    left, top, right, bottom = _union(words_in_line)
+    band_top = float(np.median([b[1] for b in words_in_line]))
+    band_bottom = float(np.median([b[3] for b in words_in_line]))
+    line_h = max(1.0, band_bottom - band_top)
+    pad = LINE_PAD * (bottom - top)
+    x0, y0, x1, y1 = max(0, int(left - pad)), max(0, int(top - pad)), min(w, int(right + pad)), min(h, int(bottom + pad))
+    region = gray[y0:y1, x0:x1]
+    count, labels, stats, centroids = cv2.connectedComponentsWithStats((region <= otsu).astype(np.uint8), connectivity=8)
+    keep = np.zeros(count, dtype=bool)
+    for i in range(1, count):
+        centre_y = centroids[i][1] + y0
+        inside = band_top - BAND_SLACK * line_h <= centre_y <= band_bottom + BAND_SLACK * line_h
+        rule_like = (stats[i, cv2.CC_STAT_WIDTH] > RULE_MIN_WIDTH * line_h
+                     and stats[i, cv2.CC_STAT_HEIGHT] < RULE_MAX_HEIGHT * line_h)
+        keep[i] = inside and not rule_like
+    cleaned = np.where((labels > 0) & ~keep[labels], 255, region)
+    return Image.fromarray(cleaned.astype(np.uint8))
