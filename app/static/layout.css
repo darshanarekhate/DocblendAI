@@ -1,0 +1,34 @@
+/* Shared by the QA page (/) and the Experience Center (/studio) with static/layout.js:
+   LLM refinement marks and the layout view (a page rebuilt at its real geometry).
+   Uses each page's own theme tokens (--accent, --moderate, --unreadable, --line, ...). */
+
+/* ---------- words the LLM changed: corrected (replaced), inferred (inserted), original ---------- */
+.w-corr { background: var(--moderate-bg); color: var(--moderate); border-radius: 3px; padding: 0 2px;
+          text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; cursor: help; }
+.w-inf { color: var(--accent); border: 1px dashed currentColor; border-radius: 3px; padding: 0 2px; font-style: italic; cursor: help; }
+.w-old, .w-del { color: var(--unreadable); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.w-del { opacity: .8; }
+.legend-words span { margin-right: 2px; }
+
+/* ---------- layout view ---------- */
+.lt-sheet { position: relative; margin: 0 auto; background: var(--panel, #fff); color: var(--text);
+            box-shadow: 0 0 0 1px var(--line), 0 6px 20px rgb(0 0 0 / .08); overflow: hidden;
+            font-family: var(--sans, system-ui, sans-serif); }
+.lt-line { position: absolute; white-space: pre; transform-origin: left center; cursor: default;
+           border-radius: 2px; color: var(--text); }
+.lt-line.lt-words { transform: none !important; }
+.lt-word { position: absolute; top: 0; white-space: pre; transform-origin: left center; }
+.lt-line.lt-title { font-weight: 700; font-family: var(--serif, Georgia, serif); }
+.lt-line.lt-llm { background: color-mix(in srgb, var(--moderate-bg) 55%, transparent); }
+.lt-line.hl { background: var(--accent-soft); outline: 1px solid var(--accent); }
+.lt-line .w-corr, .lt-line .w-inf { padding: 0; border-radius: 2px; }
+.lt-table { position: absolute; overflow: hidden; }
+.lt-table .table-wrap { width: 100%; height: 100%; overflow: hidden; margin: 0; }
+.lt-table table { width: 100%; height: 100%; border-collapse: collapse; font-size: inherit; line-height: 1.15; }
+.lt-table td, .lt-table th { border: 1px solid var(--line); padding: 0 .3em; vertical-align: middle; text-align: left; }
+.lt-figure { position: absolute; border: 1px dashed var(--faint, #888); border-radius: 4px; color: var(--faint, #888);
+             display: flex; align-items: flex-start; justify-content: flex-end; padding: 2px 4px; font-size: 11px; pointer-events: none; }
+.lt-formula { position: absolute; font-family: var(--mono, ui-monospace, monospace); color: var(--accent);
+              white-space: pre-wrap; overflow: hidden; line-height: 1.1; }
+.lt-pre { margin: 0; padding: 16px 18px; white-space: pre-wrap; word-break: break-word; font: 14px/1.55 var(--mono, ui-monospace, monospace); }
+.lt-flow { padding: 4px 6px; }

@@ -3,6 +3,8 @@
 Responsibility: turn one result object (docs/experience_center_contract.md §4),
 including the user's review edits, into a file:
 - txt: recognised text, one line per OCR line, pages separated by a header
+- layout (.layout.txt): the same text placed on a monospace grid from its line and word boxes,
+  so indentation, column gaps (tables) and paragraph spacing look like the page
 - json: the full result object
 - md: the parsed Markdown (PP-StructureV3 / Office) or the lines as paragraphs
 - pdf: searchable PDF: each page image with an invisible, selectable text layer
@@ -28,7 +30,11 @@ FORMATS = {
     "pdf": ("application/pdf", "pdf"),
     "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
     "csv": ("text/csv; charset=utf-8", "csv"),
+    "layout": ("text/plain; charset=utf-8", "layout.txt"),
 }
+
+# Layout text: at most this many blank lines between two text rows (a big figure is not 40 empty lines).
+MAX_BLANK_ROWS = 3
 
 # Page images are rendered at paddle_pdf_dpi; this maps their pixels to PDF points.
 POINTS_PER_INCH = 72
@@ -59,6 +65,81 @@ def to_txt(result: dict) -> bytes:
     if len(pages) == 1:
         return (page_text(pages[0]) or result_markdown(result)).encode("utf-8")
     blocks = [f"===== Page {i + 1} =====\n{page_text(p) or (p.get('markdown') or '')}" for i, p in enumerate(pages)]
+    return "\n\n".join(blocks).encode("utf-8")
+
+
+def _median(values: list[float], default: float) -> float:
+    values = sorted(v for v in values if v > 0)
+    return values[len(values) // 2] if values else default
+
+
+def _layout_items(line: dict) -> list[tuple[float, float, str]]:
+    """(x0, x1, text) pieces of one line: its words when they still spell the line, else the whole line."""
+    words = [w for w in line.get("words") or [] if w.get("box") and w.get("text")]
+    if words and "".join(w["text"] for w in words) == "".join(line["text"].split()):
+        return [(w["box"][0], w["box"][2], w["text"]) for w in words]
+    return [(line["box"][0], line["box"][2], line["text"])]
+
+
+# A gap wider than this many of the line's own characters is a column gap (kept); smaller is a space.
+COLUMN_GAP_CHARS = 2.5
+
+
+def page_layout_text(page: dict) -> str:
+    """One page as monospace text: each line at its row, indentation and column gaps kept.
+
+    Columns come from the page's median character width, rows from its median line height;
+    gaps between rows become blank lines (up to MAX_BLANK_ROWS). Inside a line, words are
+    joined by one space unless the gap is a real column gap (tables, tab stops), which is kept.
+    """
+    lines = [l for l in page.get("lines") or [] if l.get("box") and l.get("text", "").strip()]
+    if not lines:
+        return page.get("text") or page_text(page) or (page.get("markdown") or "")
+    char_w = _median([(l["box"][2] - l["box"][0]) / max(1, len(l["text"])) for l in lines], 8.0)
+    line_h = _median([l["box"][3] - l["box"][1] for l in lines], 12.0)
+    left = min(l["box"][0] for l in lines)
+
+    rows: list[list[dict]] = []  # lines that share a row (vertical overlap), top to bottom
+    for line in sorted(lines, key=lambda l: (l["box"][1] + l["box"][3]) / 2):
+        y0, y1 = line["box"][1], line["box"][3]
+        if rows:
+            top, bottom = min(l["box"][1] for l in rows[-1]), max(l["box"][3] for l in rows[-1])
+            if min(bottom, y1) - max(top, y0) > 0.5 * min(bottom - top, y1 - y0):
+                rows[-1].append(line)
+                continue
+        rows.append([line])
+
+    out: list[str] = []
+    previous_bottom = None
+    for row in rows:
+        top = min(l["box"][1] for l in row)
+        if previous_bottom is not None:
+            blanks = int(round((top - previous_bottom) / line_h))
+            out.extend([""] * max(0, min(MAX_BLANK_ROWS, blanks)))
+        previous_bottom = max(l["box"][3] for l in row)
+        pieces = []
+        for line in row:
+            own_w = (line["box"][2] - line["box"][0]) / max(1, len(line["text"]))
+            pieces.extend((x0, x1, text, own_w) for x0, x1, text in _layout_items(line))
+        text, prev_x1 = "", None
+        for x0, x1, piece, own_w in sorted(pieces, key=lambda i: i[0]):
+            column = int(round((x0 - left) / char_w))
+            if not text:
+                text = " " * column + piece
+            elif x0 - prev_x1 > COLUMN_GAP_CHARS * own_w:
+                text = text.ljust(max(column, len(text) + 2)) + piece  # column gap: keep the position
+            else:
+                text += " " + piece
+            prev_x1 = x1
+        out.append(text.rstrip())
+    return "\n".join(out)
+
+
+def to_layout_txt(result: dict) -> bytes:
+    pages = result.get("pages") or []
+    if len(pages) == 1:
+        return page_layout_text(pages[0]).encode("utf-8")
+    blocks = [f"===== Page {i + 1} =====\n{page_layout_text(p)}" for i, p in enumerate(pages)]
     return "\n\n".join(blocks).encode("utf-8")
 
 
@@ -317,5 +398,5 @@ def export(result: dict, fmt: str, page_images: list[Path | None] | None = None,
     media_type, ext = FORMATS[fmt]
     if fmt == "pdf":
         return to_searchable_pdf(result, page_images or [], dpi), media_type, ext
-    builders = {"txt": to_txt, "json": to_json, "md": to_md, "docx": to_docx}
+    builders = {"txt": to_txt, "json": to_json, "md": to_md, "docx": to_docx, "layout": to_layout_txt}
     return builders[fmt](result), media_type, ext

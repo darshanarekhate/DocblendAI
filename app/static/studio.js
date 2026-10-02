@@ -2,6 +2,9 @@
  *
  * Upload an image, PDF or Office file, pick a pipeline (Text OCR / PP-StructureV3 / PaddleOCR-VL),
  * and see the page with a confidence-coloured box around each line next to the parsed result.
+ * Every upload is refined by Gemini automatically and is also a document on the question page:
+ * the refined text is shown with corrected / inferred words marked (hover: the original), with
+ * Show original, Revert to original, Retry, a Layout view and the document's versions.
  * Talks only to the /api endpoints in docs/experience_center_contract.md (§3, result object §4,
  * calibration report §1). Plain JavaScript, no build step, no external libraries.
  *
@@ -188,7 +191,7 @@ async function loadHealth() {
       ["Device", eng.device || h.device], ["Calibration", calText],
       ["Review below", h.review_threshold != null ? pct(h.review_threshold) : null],
       ["Max upload", h.max_upload_mb ? `${h.max_upload_mb} MB` : null],
-      ["Gemini (refine)", h.llm ? (h.llm.enabled ? h.llm.model : "not configured") : null],
+      ["LLM refinement", h.llm ? (h.llm.enabled ? `${h.llm.model}, every upload` : h.llm.message || "off") : null],
     ].filter(([, v]) => v != null && v !== "");
     const dl = el("dl");
     for (const [k, v] of rows) dl.append(el("dt", { text: k }), el("dd", { text: String(v) }));
@@ -661,6 +664,7 @@ function goPage(delta) {
   state.selected = null;
   renderPage(true);
   renderLines();
+  renderLayout();
 }
 
 $("zoom-in").addEventListener("click", () => zoomBy(1.25));
@@ -758,7 +762,7 @@ function renderLines() {
   const all = page.lines || [];
   if (!all.length) {
     linesEl.append(el("li", { class: "empty",
-      text: r.pipeline === "office" ? "Office files have no OCR lines. The text is in the Markdown tab." : "No text lines were found on this page." }));
+      text: "No text lines were found on this page." }));
     return;
   }
   const shown = all.filter(visible).length;
@@ -768,24 +772,20 @@ function renderLines() {
     if (!visible(line)) return;
     const id = lineId(line, state.page, i), c = confOf(line), tier = tierOf(c);
     const llm = isLlmLine(line);
+    const shown = state.showOriginal ? DocLayout.originalText(line) : line.text;
     const textBtn = el("button", { type: "button", class: `ln-text${line.text ? "" : " empty-text"}`,
-      "aria-label": `Line ${i + 1}: ${line.text || "empty"}${llm ? `, corrected by Gemini from: ${line.ocr_text}` : ""}. Confidence ${pct(c)}${needsReview(c) ? ", needs review" : ""}. Press to edit.` },
-      llm && line.llm_diff ? diffNodes(line.llm_diff, "refined") : line.text || "(empty)");
+      "aria-label": `Line ${i + 1}: ${shown || "empty"}${llm && !state.showOriginal ? `, refined by the LLM; original: ${line.ocr_text}` : ""}. Confidence ${pct(c)}${needsReview(c) ? ", needs review" : ""}. Press to edit.` },
+      shown ? DocLayout.lineContent(line, state.showOriginal ? "original" : "refined") : "(empty)");
     textBtn.addEventListener("click", () => selectLine(id, { edit: true }));
     const li = el("li", { class: `ln${id === state.selected ? " sel" : ""}`, "data-id": id, "data-index": String(i) },
       el("span", { class: "ln-no", "aria-hidden": "true", text: String(i + 1) }),
       textBtn,
       el("span", { class: "ln-flags", "aria-hidden": "true" },
-        llm ? el("span", { class: "flag llm", title: line.source === "llm-auto" ? "Corrected automatically by Gemini" : "Accepted from Gemini's refinement", text: line.source === "llm-auto" ? "auto-corrected" : "LLM" })
+        llm ? el("span", { class: "flag llm", title: `Refined by the LLM. Original: ${line.ocr_text ?? ""}`, text: line.llm_status === "inferred" ? "LLM: inferred" : "LLM" })
           : line.edited ? el("span", { class: "flag edited", text: "edited" }) : null,
         line.llm_flag ? el("span", { class: "flag review", title: line.llm_flag, text: "LLM change rejected" }) : null,
         needsReview(c) ? el("span", { class: "flag review", text: "needs review" }) : null,
         el("span", { class: `conf ${tier}`, title: confTitle(line), text: pct(c) })));
-    if (llm && line.ocr_text != null) {
-      // Raw recognition next to the corrected text, removed / replaced words struck through.
-      li.append(el("span", { class: "ln-ocr" }, el("span", { class: "sub-label", text: "Recognised: " }),
-        line.llm_diff ? diffNodes(line.llm_diff, "original") : line.ocr_text));
-    }
     li.addEventListener("mouseenter", () => highlight(id, "list"));
     li.addEventListener("mouseleave", () => highlight(null, "list"));
     li.addEventListener("focusin", () => highlight(id, "list"));
@@ -804,13 +804,14 @@ function confTitle(line) {
 /** Highlight one line in both the list and the overlay (id null clears). */
 function highlight(id, from) {
   state.hovered = id;
-  for (const n of document.querySelectorAll(".ln.hl, polygon.hl")) n.classList.remove("hl");
+  for (const n of document.querySelectorAll(".ln.hl, polygon.hl, .lt-line.hl, .rv.hl")) n.classList.remove("hl");
   if (!id) return;
   const sel = `[data-id="${CSS.escape(id)}"]`;
   const li = linesEl.querySelector(`li${sel}`), poly = overlay.querySelector(`polygon${sel}`);
   li?.classList.add("hl");
   poly?.classList.add("hl");
-  if (from === "list" || from === "review") ensureBoxVisible(id);
+  document.querySelector(`#layout-view .lt-line${sel}`)?.classList.add("hl");
+  if (from === "list" || from === "layout" || from === "changes") ensureBoxVisible(id);
   if (from === "box" && li && !textPanel.hidden) scrollWithin(textPanel, li);
 }
 
@@ -899,122 +900,26 @@ async function saveLine(pageIndex, lineIndex, text, li, input) {
   }
 }
 
+const { markdownToHtml, sanitizeTable, diffNodes, isLlmLine } = window.DocLayout;  // static/layout.js
+
 // ---------------------------------------------------------------------------------------------
 // Markdown: a small renderer that escapes everything first (headings, lists, emphasis, code,
 // quotes, pipe tables). HTML <table> blocks from the parser are sanitised and kept; figures
 // become a short note; any other HTML is shown as text.
 // ---------------------------------------------------------------------------------------------
 
-function renderInline(s) {
-  const codes = [];
-  let out = esc(s).replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return `\u0001${codes.length - 1}\u0001`; });
-  out = out
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/__(.+?)__/g, "<strong>$1</strong>")
-    .replace(/(^|[^\w*])\*(\S(?:.*?\S)?)\*(?=[^\w*]|$)/g, "$1<em>$2</em>")
-    .replace(/(^|[^\w])_(\S(?:.*?\S)?)_(?=[^\w]|$)/g, "$1<em>$2</em>")
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-  return out.replace(/\u0001(\d+)\u0001/g, (_, i) => `<code>${codes[Number(i)]}</code>`);
-}
-
-function markdownToHtml(md) {
-  const blocks = [];  // pre-rendered safe HTML chunks, referenced by placeholder lines
-  const hold = (html) => `\n\u0000${blocks.push(html) - 1}\u0000\n`;
-  let src = String(md || "").replace(/\r\n?/g, "\n");
-  src = src.replace(/<table[\s\S]*?<\/table>/gi, (m) => hold(sanitizeTable(m).outerHTML));
-  src = src.replace(/<img\b[^>]*>/gi, () => hold('<span class="figure-note">[figure]</span>'));
-  src = src.replace(/<\/?(?:div|html|body|center|span|p|br)\b[^>]*>/gi, "\n");  // layout wrappers only
-
-  const lines = src.split("\n");
-  let html = "", para = [], list = null;
-  const flushPara = () => { if (para.length) { html += `<p>${renderInline(para.join(" "))}</p>`; para = []; } };
-  const closeList = () => { if (list) { html += `</${list}>`; list = null; } };
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i], t = line.trim();
-    const held = /^\u0000(\d+)\u0000$/.exec(t);
-    if (held) { flushPara(); closeList(); html += blocks[Number(held[1])]; continue; }
-    if (/^```/.test(t)) {  // fenced code
-      flushPara(); closeList();
-      const code = [];
-      while (++i < lines.length && !/^```/.test(lines[i].trim())) code.push(lines[i]);
-      html += `<pre><code>${esc(code.join("\n"))}</code></pre>`;
-      continue;
-    }
-    if (t.startsWith("$$")) {  // display formula: show its LaTeX source
-      flushPara(); closeList();
-      const f = [t];
-      const closedOnSameLine = t.length > 2 && t.endsWith("$$");
-      if (!closedOnSameLine) while (++i < lines.length) { f.push(lines[i]); if (lines[i].trim().endsWith("$$")) break; }
-      html += `<pre><code>${esc(f.join("\n").replace(/\$\$/g, "").trim())}</code></pre>`;
-      continue;
-    }
-    if (!t) { flushPara(); closeList(); continue; }
-    const h = /^(#{1,6})\s+(.*)$/.exec(t);
-    if (h) { flushPara(); closeList(); const lv = Math.min(4, h[1].length); html += `<h${lv}>${renderInline(h[2])}</h${lv}>`; continue; }
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) { flushPara(); closeList(); html += "<hr>"; continue; }
-    if (t.startsWith(">")) { flushPara(); closeList(); html += `<blockquote>${renderInline(t.replace(/^>\s?/, ""))}</blockquote>`; continue; }
-    // pipe table: header row, then a |---|---| separator
-    if (t.includes("|") && i + 1 < lines.length && /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/.test(lines[i + 1].trim())) {
-      flushPara(); closeList();
-      const cells = (row) => row.trim().replace(/^\||\|$/g, "").split("|").map((c) => renderInline(c.trim()));
-      let t2 = `<div class="table-wrap"><table><thead><tr>${cells(t).map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>`;
-      i++;
-      while (i + 1 < lines.length && lines[i + 1].includes("|") && lines[i + 1].trim()) {
-        t2 += `<tr>${cells(lines[++i]).map((c) => `<td>${c}</td>`).join("")}</tr>`;
-      }
-      html += `${t2}</tbody></table></div>`;
-      continue;
-    }
-    const bullet = /^[-*+•]\s+(.*)$/.exec(t), num = /^\d+[.)]\s+(.*)$/.exec(t);
-    if (bullet || num) {
-      flushPara();
-      const kind = bullet ? "ul" : "ol";
-      if (list !== kind) { closeList(); html += `<${kind}>`; list = kind; }
-      html += `<li>${renderInline((bullet || num)[1])}</li>`;
-      continue;
-    }
-    closeList();
-    para.push(t);
-  }
-  flushPara();
-  closeList();
-  return html;
-}
-
-/** Rebuild table HTML from an allow-list. Returns a <div class="table-wrap"> holding the table(s). */
-function sanitizeTable(html) {
-  const ALLOWED = new Set(["TABLE", "THEAD", "TBODY", "TFOOT", "TR", "TH", "TD"]);
-  const DROP = new Set(["SCRIPT", "STYLE", "TEMPLATE", "IFRAME", "OBJECT", "EMBED", "NOSCRIPT", "SVG", "MATH"]);
-  const doc = new DOMParser().parseFromString(String(html), "text/html");  // inert: nothing runs or loads
-  const wrap = el("div", { class: "table-wrap" });
-  const copy = (from, to) => {
-    for (const n of from.childNodes) {
-      if (n.nodeType === Node.TEXT_NODE) { to.append(n.textContent); continue; }
-      if (n.nodeType !== Node.ELEMENT_NODE || DROP.has(n.tagName)) continue;
-      if (ALLOWED.has(n.tagName)) {
-        const e = document.createElement(n.tagName.toLowerCase());
-        for (const a of ["colspan", "rowspan"]) {
-          const v = n.getAttribute(a);
-          if (v && /^\d{1,3}$/.test(v)) e.setAttribute(a, v);
-        }
-        copy(n, e);
-        to.append(e);
-      } else {
-        copy(n, to);  // unknown wrapper (b, span, div…): keep its text, drop the tag
-      }
-    }
-  };
-  copy(doc.body, wrap);
-  return wrap;
-}
-
 function renderMarkdown() {
-  const md = state.current?.markdown ?? (state.current?.pages || []).map((p) => p.markdown || "").join("\n\n");
+  let md = state.current?.markdown ?? (state.current?.pages || []).map((p) => p.markdown || "").join("\n\n");
+  const allLines = (state.current?.pages || []).flatMap((p) => p.lines || []);
+  if (state.showOriginal) md = DocLayout.originalMarkdown(md, allLines);
   const view = $("md-view"), source = $("md-source");
   source.textContent = md || "";
   if (!state.current) view.innerHTML = '<p class="empty">Run a document to see its Markdown here.</p>';
   else if (!md) view.innerHTML = '<p class="empty">This result has no Markdown.</p>';
-  else view.innerHTML = markdownToHtml(md);  // safe: markdownToHtml escapes all text itself
+  else {
+    view.innerHTML = markdownToHtml(md);  // safe: markdownToHtml escapes all text itself
+    if (!state.showOriginal) DocLayout.highlightIn(view, allLines);
+  }
   view.hidden = state.mdRaw;
   source.hidden = !state.mdRaw;
   $("md-rendered").setAttribute("aria-pressed", String(!state.mdRaw));
@@ -1321,63 +1226,113 @@ for (const b of document.querySelectorAll("#export [data-fmt]")) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// History: GET /api/results?q=&limit=50 (newest first); click to reopen, × to delete
+// Documents: GET /documents/library?q= (the same documents as the question page, newest first).
+// Click to open; documents still being read show their progress (polled); × deletes everywhere.
 // ---------------------------------------------------------------------------------------------
 
-let historyTimer = null;
+let historyTimer = null, libraryPoll = null;
+const REFINE_TAG = { refined: "refined by LLM", reverted: "original text", unavailable: "not refined", off: "", empty: "" };
+
 async function loadHistory() {
   const ul = $("history");
   const q = $("history-q").value.trim();
+  clearTimeout(libraryPoll);
   try {
-    const rows = await api(`/api/results?limit=50${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+    const rows = await api(`/documents/library${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     ul.replaceChildren();
     if (!Array.isArray(rows) || !rows.length) {
-      ul.append(el("li", { class: "empty", text: q ? "No past runs match." : "No past runs yet." }));
+      ul.append(el("li", { class: "empty", text: q ? "No documents match." : "No documents yet." }));
       return;
     }
-    for (const row of rows) {
-      const when = row.created_at ? new Date(row.created_at) : null;
-      const meta = [PIPELINE_LABEL[row.pipeline] || row.pipeline,
-        row.status !== "done" ? row.status : null,
-        row.page_count != null ? `${row.page_count} p.` : null,
-        row.mean_confidence != null ? `mean ${pct(row.mean_confidence)}` : null,
-        when && !Number.isNaN(when.getTime()) ? when.toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : null,
-      ].filter(Boolean).join(" · ");
-      const open = el("button", { type: "button", class: "h-open", title: `Open ${row.filename}` },
-        el("span", { class: "h-name", text: row.filename || row.id }), el("span", { class: "h-meta", text: meta }));
-      open.addEventListener("click", () => openHistory(row.id));
-      const del = el("button", { type: "button", class: "job-x", "aria-label": `Delete ${row.filename} from history`, title: "Delete" }, "×");
-      del.addEventListener("click", () => deleteHistory(row));
-      ul.append(el("li", {}, open, del));
-    }
+    for (const row of rows) ul.append(libraryItem(row));
+    // Keep progress live while anything is being read or refined.
+    if (rows.some((r) => r.status === "processing" || r.refine)) libraryPoll = setTimeout(loadHistory, 2000);
   } catch (err) {
-    ul.replaceChildren(el("li", { class: "empty",
-      text: err.status === 404 || err.status === 405 || err.status === 422 ? "History is not available on this server yet." : err.message }));
+    ul.replaceChildren(el("li", { class: "empty", text: err.message }));
   }
 }
 
-async function openHistory(id) {
+function libraryItem(row) {
+  const when = row.created_at ? new Date(row.created_at) : null;
+  const ref = row.refinement?.status;
+  const meta = [row.format_type, PIPELINE_LABEL[row.pipeline] || null,
+    row.page_count != null ? `${row.page_count} p.` : null,
+    row.status === "processing" ? row.message || "Reading…" : null,
+    row.status === "error" ? "failed" : null,
+    row.refine ? row.refine.message : REFINE_TAG[ref] || null,
+    !row.doc_id && row.status === "ready" ? "not on the question page" : null,
+    when && !Number.isNaN(when.getTime()) ? when.toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : null,
+  ].filter(Boolean).join(" · ");
+  const open = el("button", { type: "button", class: "h-open", title: row.error || `Open ${row.name}` },
+    el("span", { class: "h-name", text: row.name || row.run_id }),
+    el("span", { class: `h-meta${row.status === "error" || ref === "unavailable" ? " bad-text" : ""}`, text: meta }));
+  if (row.run_id && row.status === "ready") open.addEventListener("click", () => openHistory(row.run_id));
+  else if (!row.run_id && row.doc_id) {
+    open.title = "Uploaded before the two pages were shared: read it here to see its layout";
+    open.addEventListener("click", () => readIntoStudio(row));
+  } else open.disabled = row.status === "processing";
+  const li = el("li", { class: row.status === "processing" ? "processing" : "" }, open);
+  if (row.status === "processing" && typeof row.progress === "number") {
+    const bar = el("progress", { max: "1", "aria-label": `Progress for ${row.name}` });
+    bar.value = row.progress;
+    li.append(bar);
+  }
+  if (row.status !== "processing") {
+    const del = el("button", { type: "button", class: "job-x", "aria-label": `Delete ${row.name}`, title: "Delete from both pages" }, "×");
+    del.addEventListener("click", () => deleteHistory(row));
+    li.append(del);
+  }
+  return li;
+}
+
+async function openHistory(id, tab) {
   try {
     const r = await api(`/api/results/${encodeURIComponent(id)}`);
-    if (r.status !== "done") { setStatus("job-status", `That run is ${r.status}${r.error ? `: ${r.error}` : ""}.`, r.status === "error" ? "error" : ""); return; }
+    if (r.status !== "done") { setStatus("job-status", `That document is ${r.status}${r.error ? `: ${r.error}` : ""}.`, r.status === "error" ? "error" : ""); return; }
     state.currentKey = null;
     setResult(r);
     renderQueue();
-    setStatus("job-status", `Opened ${r.filename || "past run"}.`);
+    setStatus("job-status", `Opened ${r.filename || "document"}.`);
+    if (tab) activateTab(`tab-${tab}`, false);
   } catch (err) {
     setStatus("job-status", err.message, "error");
   }
 }
 
-async function deleteHistory(row) {
-  if (!confirm(`Delete the saved result for "${row.filename}"? Your original file is not touched.`)) return;
+async function readIntoStudio(row) {
   try {
-    await api(`/api/results/${encodeURIComponent(row.id)}`, { method: "DELETE" });
-    setStatus("job-status", `Deleted ${row.filename}.`);
+    await api(`/documents/${encodeURIComponent(row.doc_id)}/experience`, { method: "POST" });
+    setStatus("job-status", `Reading ${row.name}…`);
   } catch (err) {
     setStatus("job-status", err.message, "error");
   }
   loadHistory();
+}
+
+async function deleteHistory(row) {
+  if (!confirm(`Delete "${row.name}"? It is removed from DocBlendAI (both pages); your original file is not touched.`)) return;
+  try {
+    if (row.doc_id) await api(`/documents/${encodeURIComponent(row.doc_id)}`, { method: "DELETE" }).catch((err) => { if (err.status) throw err; });
+    else await api(`/api/results/${encodeURIComponent(row.run_id)}`, { method: "DELETE" });
+    if (state.current && (state.current.id === row.run_id)) { state.current = null; setResult(null); }
+    setStatus("job-status", `Deleted ${row.name}.`);
+  } catch (err) {
+    setStatus("job-status", err.message, "error");
+  }
+  loadHistory();
+}
+
+/** Links from the question page: /studio?run=<run id>[&tab=layout|changes] or ?doc=<doc id>. */
+async function openFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const run = params.get("run"), doc = params.get("doc"), tab = params.get("tab");
+  if (run) return openHistory(run, tab);
+  if (doc) {
+    const rows = await api("/documents/library").catch(() => []);
+    const row = rows.find((r) => r.doc_id === doc);
+    if (row?.run_id) return openHistory(row.run_id, tab);
+    if (row) setStatus("job-status", `${row.name} has not been read here yet: click it in Documents to read it.`);
+  }
 }
 
 $("history-refresh").addEventListener("click", loadHistory);
@@ -1459,83 +1414,119 @@ function renderPlugins() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Refine with LLM: POST /api/results/{id}/refine (re-extract -> Gemini -> proposal), Review tab
-// with a per-line word diff (corrected / inferred / removed words), accept / reject per line or
-// all, and the run's versions (compare with the current text, restore). See contract §7.
+// LLM refinement (automatic on every upload): status bar, Show original, Revert / Use refined
+// text, Retry; Changes tab (what Gemini changed, read-only) and versions; Layout tab.
+// Contract §7: /api/results/{id}/changes, /revert, /reapply, /refine (retry), /versions.
 // ---------------------------------------------------------------------------------------------
 
-state.review = null;      // pending proposal of the current run: {id, seq, status, data: {lines, counts, ...}}
-state.refineJob = null;   // job id being polled
+state.showOriginal = false;
+state.refineJob = null;     // a retry being polled
+state.layoutScale = "fit";  // number (px per page px) or "fit"
 const STATUS_LABEL = { corrected: "corrected", inferred: "inferred", rejected: "rejected", unchanged: "unchanged" };
-const isLlmLine = (line) => line && (line.source === "llm" || line.source === "llm-auto");
-
-/** Words of a diff for one side: the original (replaced/removed words struck) or the refined text
- *  (corrected words highlighted, inferred words marked). */
-function diffNodes(ops, side) {
-  const span = el("span", { class: "diff" });
-  for (const op of ops || []) {
-    let node;
-    if (side === "original") {
-      if (op.op === "insert") continue;
-      const cls = op.op === "replace" ? "w-old" : op.op === "delete" ? "w-del" : null;
-      node = cls ? el("span", { class: cls, title: op.op === "replace" ? `corrected to "${op.refined}"` : "removed", text: op.original })
-        : document.createTextNode(op.original);
-    } else {
-      if (op.op === "delete") continue;
-      const cls = op.op === "replace" ? "w-corr" : op.op === "insert" ? "w-inf" : null;
-      node = cls ? el("span", { class: cls, title: op.op === "replace" ? `corrected from "${op.original}"` : "inferred from context (not on the page as read)", text: op.refined })
-        : document.createTextNode(op.refined);
-    }
-    if (span.childNodes.length) span.append(" ");
-    span.append(node);
-  }
-  return span;
-}
 
 function renderRefineBar() {
-  const bar = $("refine-bar"), btn = $("refine-btn"), note = $("refine-note");
-  const r = state.current;
+  const r = state.current, bar = $("refine-bar");
   bar.hidden = !r?.id || r.status !== "done";
   if (bar.hidden) return;
-  const llm = state.health?.llm;
-  const enabled = !llm || llm.enabled !== false;
+  const ref = r.refinement || {};
   const busy = !!state.refineJob || !!r.active_job;
-  btn.disabled = !enabled || busy;
-  btn.textContent = busy ? "Refining…" : "Refine with LLM";
-  note.className = enabled ? "hint" : "hint bad-text";
-  note.textContent = !enabled ? (llm.message || "Gemini is not configured on this server.")
-    : busy ? "Wait for the current refinement to finish."
-    : "Re-reads the original file, then Gemini proposes corrections that you review line by line.";
+  const badge = $("llm-badge"), msg = $("refine-msg");
+  const label = { refined: "Refined by LLM", reverted: "Original text", unavailable: "Not refined", off: "Not refined", empty: "Nothing to refine" }[ref.status] || "Not refined";
+  badge.textContent = busy ? "Refining…" : label;
+  badge.className = `llm-badge ${busy ? "busy" : ref.status || "none"}`;
+  badge.title = ref.message || "";
+  msg.textContent = busy ? "" : ref.status === "unavailable" ? ref.message.replace(/^Not refined: /, "")
+    : ref.status === "refined" ? `${ref.corrected ?? 0} line${ref.corrected === 1 ? "" : "s"} corrected by ${ref.model || "Gemini"}.`
+    : ref.status === "reverted" ? "Showing the original extraction; the LLM refinement is kept in the history."
+    : ref.message || "";
+  const llmLines = (r.pages || []).some((p) => (p.lines || []).some(isLlmLine));
+  const llmOn = state.health?.llm?.enabled !== false;
+  $("show-original").hidden = !llmLines;
+  $("show-original").setAttribute("aria-pressed", String(state.showOriginal));
+  $("show-original").textContent = state.showOriginal ? "Show refined text" : "Show original";
+  $("revert-btn").hidden = ref.status !== "refined" || busy;
+  $("reapply-btn").hidden = ref.status !== "reverted" || busy;
+  $("retry-btn").hidden = busy || !["unavailable", "off", "empty"].includes(ref.status || "unavailable") || !llmOn;
+  $("retry-btn").textContent = ref.status === "unavailable" ? "Retry" : "Refine with Gemini";
+  const ask = $("ask-link");
+  ask.hidden = !r.doc_id;
+  if (r.doc_id) ask.href = `/?doc=${encodeURIComponent(r.doc_id)}`;
 }
 
 function onResultShown(result) {
-  state.review = null;
+  state.showOriginal = false;
+  state.changes = null;
   $("version-compare").replaceChildren();
   renderRefineBar();
-  renderReview();
+  renderLayout();
+  renderChanges();
   if (!result?.id || result.status !== "done") return;
   if (result.active_job && state.refineJob !== result.active_job.id) pollRefine(result.active_job.id, result.id);
-  loadReview(result.id);
-  if (!$("panel-review").hidden) loadVersions();
+  loadChanges(result.id);
+  if (!$("panel-changes").hidden) loadVersions();
 }
 
-async function startRefine() {
+/** Swap in a new copy of the current result, keeping the page, zoom and tab. */
+function replaceCurrent(result) {
+  const page = state.page, view = { ...state.view };
+  const job = state.jobs.find((j) => j.key === state.currentKey);
+  if (job) job.result = result;
+  state.current = result;
+  state.page = clamp(page, 0, Math.max(0, (result.pages || []).length - 1));
+  state.view = view;
+  renderGlobal();
+  renderPage(false);
+  renderLines();
+  renderMarkdown();
+  renderJson();
+  renderTables();
+  renderLayout();
+  renderRefineBar();
+}
+
+function setShowOriginal(on) {
+  state.showOriginal = on;
+  renderRefineBar();
+  renderLines();
+  renderMarkdown();
+  renderLayout();
+}
+$("show-original").addEventListener("click", () => setShowOriginal(!state.showOriginal));
+
+async function textAction(path, confirmText, done) {
+  const r = state.current;
+  if (!r?.id || (confirmText && !confirm(confirmText))) return;
+  setStatus("refine-status", "Working… (the document is re-embedded for questions)");
+  try {
+    const result = await api(`/api/results/${encodeURIComponent(r.id)}/${path}`, { method: "POST" });
+    state.showOriginal = false;
+    replaceCurrent(result);
+    setStatus("refine-status", done, "ok");
+    loadChanges(r.id);
+    if (!$("panel-changes").hidden) loadVersions();
+    loadHistory();
+  } catch (err) {
+    setStatus("refine-status", err.message, "error");
+  }
+}
+$("revert-btn").addEventListener("click", () => textAction("revert",
+  "Use the original extraction instead of the LLM-refined text? Questions will be answered from the original; you can switch back.",
+  "Reverted to the original extraction."));
+$("reapply-btn").addEventListener("click", () => textAction("reapply", null, "Using the LLM-refined text again."));
+
+async function retryRefine() {
   const r = state.current;
   if (!r?.id) return;
-  const body = {};
-  if (anyPreprocess() && !OFFICE.includes(extOf(r.filename))) body.preprocess = preprocessOptions();
-  if ($("format-hint").value) body.format_hint = $("format-hint").value;
   setStatus("refine-status", "Starting…");
   try {
-    const job = await api(`/api/results/${encodeURIComponent(r.id)}/refine`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
+    const job = await api(`/api/results/${encodeURIComponent(r.id)}/refine`, { method: "POST" });
     await pollRefine(job.job_id, r.id);
   } catch (err) {
     setStatus("refine-status", err.message, "error");
     renderRefineBar();
   }
 }
+$("retry-btn").addEventListener("click", retryRefine);
 
 async function pollRefine(jobId, runId) {
   state.refineJob = jobId;
@@ -1557,12 +1548,13 @@ async function pollRefine(jobId, runId) {
       bar.value = j.progress || 0;
       if (j.message && j.message !== last) { setStatus("refine-status", j.message); last = j.message; }
       if (j.status === "done" || j.status === "error") {
-        // Re-extraction replaced the current text even if Gemini then failed: show the fresh result.
+        state.refineJob = null;
         const fresh = await api(`/api/results/${encodeURIComponent(runId)}`).catch(() => null);
-        if (fresh && state.current?.id === runId) { state.refineJob = null; replaceCurrent(fresh); }
-        if (j.status === "error") { setStatus("refine-status", j.error || "Refinement failed.", "error"); break; }
-        setStatus("refine-status", j.message || "Ready for review", "ok");
-        if (state.current?.id === runId) { await loadReview(runId); activateTab("tab-review", false); }
+        if (fresh && state.current?.id === runId) replaceCurrent(fresh);
+        if (j.status === "error") setStatus("refine-status", j.error || "Refinement failed.", "error");
+        else setStatus("refine-status", "Ready: the refined text is used for questions and exports.", "ok");
+        if (state.current?.id === runId) loadChanges(runId);
+        loadHistory();
         break;
       }
       await sleep(POLL_MS);
@@ -1576,100 +1568,63 @@ async function pollRefine(jobId, runId) {
   }
 }
 
-/** Swap in a new copy of the current result, keeping the page, zoom and tab. */
-function replaceCurrent(result) {
-  const page = state.page, view = { ...state.view };
-  const job = state.jobs.find((j) => j.key === state.currentKey);
-  if (job) job.result = result;
-  state.current = result;
-  state.page = clamp(page, 0, Math.max(0, (result.pages || []).length - 1));
-  state.view = view;
-  renderGlobal();
-  renderPage(false);
-  renderLines();
-  renderMarkdown();
-  renderJson();
-  renderTables();
-  if (typeof renderLayout === "function") renderLayout();
-  renderRefineBar();
-}
+// --- Changes tab: what Gemini changed, line by line (read-only) ------------------------------
 
-async function loadReview(runId) {
+async function loadChanges(runId) {
   try {
-    state.review = await api(`/api/results/${encodeURIComponent(runId)}/refinement`);
-  } catch (err) {
-    state.review = null;
-    if (err.status !== 404) setStatus("refine-status", err.message, "error");
+    state.changes = await api(`/api/results/${encodeURIComponent(runId)}/changes`);
+  } catch {
+    state.changes = null;  // 404: not refined
   }
-  renderReview();
+  if (state.current?.id === runId) renderChanges();
 }
 
-function renderReview() {
-  const view = $("review-view"), badge = $("review-badge");
+function renderChanges() {
+  const view = $("changes-view"), badge = $("changes-badge");
   view.replaceChildren();
-  const v = state.review, r = state.current;
-  const pending = v ? (v.data.lines || []).filter((l) => l.decision === "pending").length : 0;
-  badge.hidden = !pending;
-  badge.textContent = String(pending);
+  const r = state.current, v = state.changes;
+  const lines = v?.data?.lines || [];
+  const changed = lines.filter((l) => l.status !== "unchanged");
+  badge.hidden = !changed.length;
+  badge.textContent = String(changed.filter((l) => l.status !== "rejected").length);
   if (!r?.id) { view.append(el("p", { class: "empty", text: "Run a document first." })); return; }
   if (!v) {
-    view.append(el("p", { class: "hint", text: "No refinement is waiting for review. Press \"Refine with LLM\": the original file is read again, Gemini proposes corrections for misread words, and nothing changes until you accept it." }));
+    view.append(el("p", { class: "hint", text: r.refinement?.message || "This document has not been refined by the LLM." }));
     return;
   }
-  const data = v.data, lines = data.lines || [];
-  const counts = data.counts || {};
-  const head = el("div", { class: "review-head" },
-    el("h4", { text: `Gemini's proposal${data.mode === "auto" ? " (automatic)" : ""}` }),
+  const counts = v.data.counts || {};
+  view.append(el("div", { class: "review-head" },
+    el("h4", { text: `What ${v.data.model || "Gemini"} changed` }),
     el("ul", { class: "chips" }, ...["corrected", "inferred", "rejected", "unchanged"].filter((k) => counts[k])
       .map((k) => el("li", { class: k === "rejected" ? "warn" : "" }, `${STATUS_LABEL[k]} `, el("b", { text: String(counts[k]) })))),
-    el("p", { class: "hint legend-words" }, "Key: ", el("span", { class: "w-corr", text: "corrected word" }), " ",
-      el("span", { class: "w-inf", text: "inferred word" }), " ", el("span", { class: "w-del", text: "removed word" }),
-      ` · lines changing more than ${pct(data.max_change ?? 0.4)} of their characters are rejected automatically`));
-  const actions = el("div", { class: "review-actions" });
-  if (pending) {
-    const all = el("button", { type: "button", class: "btn", text: `Accept all (${pending})` });
-    const none = el("button", { type: "button", class: "btn ghost", text: "Reject all" });
-    all.addEventListener("click", () => decide("accept", null, all));
-    none.addEventListener("click", () => decide("discard", null, none));
-    actions.append(all, none);
-  } else {
-    actions.append(el("p", { class: "hint", text: `Reviewed (${v.status}).` }));
-  }
-  view.append(head, actions);
-
-  const changed = lines.filter((l) => l.status !== "unchanged");
-  if (!changed.length) view.append(el("p", { class: "empty", text: "Gemini found nothing to correct." }));
+    el("p", { class: "hint legend-words" }, "Applied automatically. ", el("span", { class: "w-corr", text: "corrected word" }), " ",
+      el("span", { class: "w-inf", text: "inferred word" }), " ", el("span", { class: "w-old", text: "replaced or removed" }),
+      ` · a line changing more than ${pct(v.data.max_change ?? 0.4)} of its characters keeps its recognised text and is flagged`),
+    r.refinement?.status === "reverted" ? el("p", { class: "status", text: "These changes are not in use: the document was reverted to its original text." }) : null));
+  if (!changed.length) { view.append(el("p", { class: "empty", text: "The LLM found nothing to correct." })); return; }
   const ol = el("ol", { class: "review-list" });
-  for (const l of changed) ol.append(reviewRow(l));
+  for (const l of changed) ol.append(changeRow(l));
   view.append(ol);
   const same = lines.length - changed.length;
   if (same) view.append(el("p", { class: "hint", text: `${same} line${same === 1 ? "" : "s"} unchanged.` }));
 }
 
-function reviewRow(l) {
+function changeRow(l) {
   const m = /^p(\d+)-l(\d+)$/.exec(l.line_id);
   const where = m ? `p. ${Number(m[1]) + 1}, line ${Number(m[2]) + 1}` : l.line_id;
-  const li = el("li", { class: `rv ${l.status} ${l.decision}`, "data-id": l.line_id },
+  const li = el("li", { class: `rv ${l.status}`, "data-id": l.line_id },
     el("div", { class: "rv-top" },
       el("button", { type: "button", class: "link-btn rv-where", title: "Show this line on the page", text: where }),
       el("span", { class: `flag st-${l.status}`, text: STATUS_LABEL[l.status] || l.status }),
-      el("span", { class: "hint", text: `${pct(l.change_ratio)} changed${l.confidence != null ? ` · confidence ${pct(l.confidence)}` : ""}` })),
+      el("span", { class: "hint", text: `${pct(l.change_ratio)} of the characters changed${l.confidence != null ? ` · confidence ${pct(l.confidence)}` : ""}` })),
     el("div", { class: "rv-cols" },
-      el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: "Recognised" }), el("p", {}, diffNodes(l.diff, "original"))),
-      el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: "Refined" }), el("p", {}, diffNodes(l.diff, "refined")))));
+      el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: "Original" }), el("p", {}, diffNodes(l.diff, "original"))),
+      el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: l.status === "rejected" ? "LLM suggested (not used)" : "Refined" }), el("p", {}, diffNodes(l.diff, "refined")))));
   if (l.reason) li.append(el("p", { class: "rv-reason", text: l.reason }));
-  if (l.decision === "pending") {
-    const ok = el("button", { type: "button", class: "btn ghost", text: "Accept" });
-    const no = el("button", { type: "button", class: "btn ghost", text: "Reject" });
-    ok.addEventListener("click", () => decide("accept", [l.line_id], ok));
-    no.addEventListener("click", () => decide("reject", [l.line_id], no));
-    li.append(el("div", { class: "rv-actions" }, ok, no));
-  } else if (l.decision !== "n/a") {
-    li.append(el("span", { class: `rv-decision ${l.decision}`, text: l.decision === "conflict" ? "not applied: the line changed since" : l.decision }));
-  }
+  if (l.decision === "conflict") li.append(el("p", { class: "rv-reason", text: "Not applied: the line had changed." }));
   li.querySelector(".rv-where").addEventListener("click", () => showLine(l.line_id));
-  li.addEventListener("mouseenter", () => highlight(l.line_id, "review"));
-  li.addEventListener("mouseleave", () => highlight(null, "review"));
+  li.addEventListener("mouseenter", () => highlight(l.line_id, "changes"));
+  li.addEventListener("mouseleave", () => highlight(null, "changes"));
   return li;
 }
 
@@ -1680,28 +1635,6 @@ function showLine(id) {
   selectLine(id);
   ensureBoxVisible(id);
 }
-
-async function decide(action, lineIds, button) {
-  const r = state.current, v = state.review;
-  if (!r?.id || !v) return;
-  button.disabled = true;
-  try {
-    const res = await api(`/api/results/${encodeURIComponent(r.id)}/refinements/${encodeURIComponent(v.id)}/${action}`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: action === "discard" ? undefined : JSON.stringify(lineIds ? { line_ids: lineIds } : {}),
-    });
-    if (res.result) replaceCurrent(res.result);
-    const n = lineIds ? lineIds.length : null;
-    setStatus("refine-status", action === "accept" ? `Accepted${n ? ` ${n} line${n === 1 ? "" : "s"}` : " all pending changes"}.`
-      : action === "discard" ? "Rejected every pending change; the text is unchanged." : "Rejected.", "ok");
-  } catch (err) {
-    setStatus("refine-status", err.message, "error");
-  }
-  await loadReview(r.id);
-  loadVersions();
-}
-
-$("refine-btn").addEventListener("click", startRefine);
 
 // --- versions -------------------------------------------------------------------------------
 
@@ -1717,16 +1650,8 @@ async function loadVersions() {
       const li = el("li", { class: `ver ${v.kind}` },
         el("span", { class: "ver-n", text: `v${v.seq}` }),
         el("span", { class: "ver-label", text: v.label }),
-        el("span", { class: "hint", text: [v.kind === "refinement" ? v.status : null,
-          Number.isNaN(when.getTime()) ? null : when.toLocaleString([], { dateStyle: "short", timeStyle: "short" })].filter(Boolean).join(" · ") }));
-      if (v.kind === "refinement") {
-        const open = el("button", { type: "button", class: "link-btn", text: ["pending", "partial"].includes(v.status) ? "Review" : "View" });
-        open.addEventListener("click", async () => {
-          try { state.review = await api(`/api/results/${encodeURIComponent(r.id)}/versions/${encodeURIComponent(v.id)}`); renderReview(); }
-          catch (err) { setStatus("refine-status", err.message, "error"); }
-        });
-        li.append(open);
-      } else {
+        el("span", { class: "hint", text: Number.isNaN(when.getTime()) ? "" : when.toLocaleString([], { dateStyle: "short", timeStyle: "short" }) }));
+      if (v.kind !== "refinement") {
         const cmp = el("button", { type: "button", class: "link-btn", text: "Compare" });
         const back = el("button", { type: "button", class: "link-btn", text: "Restore" });
         cmp.addEventListener("click", () => compareVersion(v));
@@ -1748,12 +1673,11 @@ async function compareVersion(v) {
     box.replaceChildren(el("h4", { text: `v${v.seq} → current: ${res.changes.length} changed line${res.changes.length === 1 ? "" : "s"}` }));
     const ol = el("ol", { class: "review-list" });
     for (const c of res.changes) {
-      const li = el("li", { class: `rv ${c.status}`, "data-id": c.line_id },
+      ol.append(el("li", { class: `rv ${c.status}`, "data-id": c.line_id },
         el("div", { class: "rv-top" }, el("span", { class: "rv-where", text: c.line_id }), el("span", { class: "flag", text: c.status })),
         el("div", { class: "rv-cols" },
           el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: `v${v.seq}` }), el("p", {}, c.diff ? diffNodes(c.diff, "original") : c.before ?? "—")),
-          el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: "Current" }), el("p", {}, c.diff ? diffNodes(c.diff, "refined") : c.after ?? "—"))));
-      ol.append(li);
+          el("div", { class: "rv-col" }, el("span", { class: "sub-label", text: "Current" }), el("p", {}, c.diff ? diffNodes(c.diff, "refined") : c.after ?? "—")))));
     }
     box.append(ol);
   } catch (err) {
@@ -1762,20 +1686,50 @@ async function compareVersion(v) {
 }
 
 async function restoreVersion(v) {
-  const r = state.current;
-  if (!confirm(`Make version ${v.seq} ("${v.label}") the current text? The current text stays in the history.`)) return;
-  try {
-    const result = await api(`/api/results/${encodeURIComponent(r.id)}/versions/${encodeURIComponent(v.id)}/restore`, { method: "POST" });
-    replaceCurrent({ ...result, id: r.id });
-    setStatus("refine-status", `Restored version ${v.seq}.`, "ok");
-  } catch (err) {
-    setStatus("refine-status", err.message, "error");
-  }
-  loadVersions();
-  loadReview(r.id);
+  await textAction(`versions/${encodeURIComponent(v.id)}/restore`,
+    `Make version ${v.seq} ("${v.label}") the current text? The current text stays in the history.`,
+    `Restored version ${v.seq}.`);
 }
 $("versions-refresh").addEventListener("click", loadVersions);
 
+// --- Layout tab: the page rebuilt at its real geometry (static/layout.js) ---------------------
+
+function renderLayout() {
+  const view = $("layout-view");
+  if ($("panel-layout").hidden) return;  // rendered when the tab is opened (it needs its width)
+  const r = state.current;
+  if (!r) { view.replaceChildren(el("p", { class: "empty", text: "Run a document to see its layout here." })); return; }
+  const page = currentPage();
+  const scale = DocLayout.render(view, r, state.page, {
+    mode: state.showOriginal ? "original" : "refined",
+    scale: state.layoutScale,
+    onHover: (id) => highlight(id, "layout"),
+    onSelect: (id) => selectLine(id),
+  });
+  const geometry = DocLayout.hasGeometry(page);
+  $("layout-zoom").textContent = geometry ? `${Math.round(scale * 100)}%` : "–";
+  for (const id of ["layout-in", "layout-out", "layout-fit"]) $(id).disabled = !geometry;
+  $("layout-note").textContent = geometry
+    ? `Page ${state.page + 1}${r.pages.length > 1 ? ` of ${r.pages.length}` : ""} rebuilt from its layout${state.showOriginal ? " (original text)" : ""}. Hover a line to find it on the page.`
+    : "This file has no page geometry: its structure (headings, lists, tables) is shown instead.";
+  state.layoutLastScale = scale;
+}
+function zoomLayout(factor) {
+  const base = typeof state.layoutScale === "number" ? state.layoutScale : state.layoutLastScale || 1;
+  state.layoutScale = clamp(base * factor, 0.2, 4);
+  renderLayout();
+}
+$("layout-in").addEventListener("click", () => zoomLayout(1.25));
+$("layout-out").addEventListener("click", () => zoomLayout(1 / 1.25));
+$("layout-fit").addEventListener("click", () => { state.layoutScale = "fit"; renderLayout(); });
+// "Fit" follows the panel's width (window resized, layout changed between one and two columns).
+let layoutWidth = 0;
+new ResizeObserver(([entry]) => {
+  const w = Math.round(entry.contentRect.width);
+  if (w === layoutWidth || w < 120) return;
+  layoutWidth = w;
+  if (state.layoutScale === "fit") requestAnimationFrame(renderLayout);
+}).observe($("layout-view"));
 
 // ---------------------------------------------------------------------------------------------
 // Tabs (WAI-ARIA tabs pattern: arrow keys move between tabs)
@@ -1792,7 +1746,8 @@ function activateTab(id, focus = true) {
   }
   if (id === "tab-calibration" && !state.calibrationLoaded) loadCalibration();
   if (id === "tab-plugins" && !state.plugins) loadPlugins();
-  if (id === "tab-review" && state.current?.id) { renderReview(); loadVersions(); }
+  if (id === "tab-changes" && state.current?.id) { renderChanges(); loadVersions(); }
+  if (id === "tab-layout") renderLayout();
 }
 for (const t of tabs) {
   t.addEventListener("click", () => activateTab(t.id));
@@ -1819,3 +1774,4 @@ renderJson();
 renderTables();
 loadHealth();
 loadHistory();
+openFromUrl();

@@ -43,7 +43,7 @@ venv/Scripts/python -m uvicorn app.main:app --reload
 
 - **App:** http://127.0.0.1:8000/ to upload PDFs, ask questions, and see reliability labels and sources
 - **Experience Center:** http://127.0.0.1:8000/studio for PaddleOCR text OCR / document parsing with
-  calibrated confidence, side by side with the original (see below)
+  calibrated confidence, side by side with the original (see below); same documents as the QA page
 - **API docs:** http://127.0.0.1:8000/docs
 
 If the server refuses to start with "database is out of date", delete `data/docblendai.db`
@@ -53,7 +53,8 @@ and the contents of `data/chroma_db/` (local dev data), restart, and re-upload.
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/upload` | Upload a PDF, image, .docx, .pptx, or .txt (optional `format_hint`: typed / scanned / handwritten) |
+| POST | `/upload` | Upload a PDF, image, .docx, .pptx, .xlsx or .txt (optional `format_hint`: typed / scanned / handwritten; `pipeline`: structure / ocr; `background=true` returns 202 at once) |
+| GET | `/documents/library` | Both pages' documents with reading progress, LLM refinement and QA state |
 | GET | `/documents` | List uploaded documents |
 | GET | `/documents/{id}/file` | The original uploaded file, inline (document viewer) |
 | DELETE | `/documents/{id}` | Remove a document (chunks, record, and file) |
@@ -82,23 +83,32 @@ pick a built-in sample; choose **Text OCR** (PP-OCRv5 mobile), **Document parsin
 - exports: TXT, Markdown, JSON, searchable PDF (page image + invisible text layer), Word, CSV
 - searchable run history (SQLite)
 
-### Refine with LLM
+### One document for both pages, refined by an LLM automatically
 
-"Refine with LLM" (button on the result toolbar) runs one background job: it **re-extracts** the
-original file (typed PDF / Word / PowerPoint / Excel / text: exact text; scans and images: PaddleOCR
-or PP-StructureV3; handwriting: TrOCR reading each of Paddle's line boxes) with the chosen clean-up,
-then sends the fresh lines with their calibrated confidence and the page structure to Gemini (the
-`refine` plugin, `app/plugins/refine.py`), which fixes misrecognised words and restores words the
-context clearly implies, line by line. The **Review** tab shows each line's recognised vs refined
-text with corrected words highlighted and inferred words marked; accept or reject per line or all.
+An upload from either page (any type) is one background job, shown with its progress on both
+pages: "Extracting page 2 of 5…" (typed PDF / Word / PowerPoint / Excel / text: exact text;
+scans and photos: PaddleOCR or PP-StructureV3; handwriting: TrOCR reading each of Paddle's line
+boxes) → "Refining with Gemini…" → "Ready". The QA page and the Experience Center list the same
+documents; deleting one deletes it everywhere.
 
-- A refined line that changes more than 40% of its characters (`REFINE_MAX_CHANGE`) is rejected:
-  the recognised text is kept and the line flagged for review.
-- Nothing is overwritten: every extraction, accepted refinement, edit and restore is a version you
-  can compare with the current text or restore (`run_versions` table).
-- Accepted lines are marked `source: "llm"`; exports use them, and LLM text never raises reliability
-  (counts at most as Moderate confidence in QA).
-- Needs `GEMINI_API_KEY`; without it (or when the free-tier quota is used up) the button and API say so.
+- **Refinement** (`app/plugins/refine.py`, `app/modules/refinement.py`): Gemini gets every line
+  with its calibrated confidence and the page structure, fixes misread words, restores words the
+  context clearly implies, and keeps layout, spacing, tables and meaning (no new facts). Changes
+  are applied without an approval step; a line that would change more than 40% of its characters
+  (`REFINE_MAX_CHANGE`) keeps its recognised text and is flagged.
+- **The refined text is used everywhere**: QA answers (re-chunked and re-embedded), the Text and
+  Layout views, exports. Corrected words are highlighted and inferred words marked differently
+  on both pages (hover shows the original). Each document shows "Refined by LLM" with
+  **Show original** and **Revert to original** (re-embeds the original; "Use refined text" goes
+  back). The original extraction, Gemini's proposal and every edit are kept as versions.
+- **LLM text never raises reliability**: lines the LLM changed count at most as Moderate
+  confidence for retrieval and reliability labels.
+- **Gemini unavailable** (no `GEMINI_API_KEY`, quota used up, error): the unrefined text is used,
+  the document says "Not refined: Gemini unavailable" with a **Retry** link, and QA is not blocked.
+- **Layout view** (Experience Center tab and the QA viewer): the page rebuilt at its real geometry
+  (words at their boxes, tables as real tables with merged cells, figures and formulas in place,
+  zoomable, hover highlights the page image too); Office and text files as structured Markdown.
+  "Layout text" export: monospace text with the page's spacing and columns.
 
 ### Confidence calibration
 
@@ -166,7 +176,14 @@ curl -F use_sample=true http://127.0.0.1:8000/api/calibrate
 curl http://127.0.0.1:8000/api/calibration
 curl -o diagram.png http://127.0.0.1:8000/api/calibration/diagram.png
 
-# Exports (with review edits): txt | md | json | pdf (searchable) | docx | csv (tables)
+# Refinement: what Gemini changed, revert to the original / use the refined text again, retry
+curl http://127.0.0.1:8000/api/results/<id>/changes
+curl -X POST http://127.0.0.1:8000/api/results/<id>/revert
+curl -X POST http://127.0.0.1:8000/api/results/<id>/reapply
+curl -X POST http://127.0.0.1:8000/api/results/<id>/refine
+curl http://127.0.0.1:8000/api/results/<id>/versions
+
+# Exports (current text): txt | layout (spacing kept) | md | json | pdf (searchable) | docx | csv (tables)
 curl -OJ http://127.0.0.1:8000/api/results/<id>/export/pdf
 
 # Clean-up before OCR, and its before/after preview (data: URLs)

@@ -188,3 +188,19 @@ def test_export_and_plugins_reject_unfinished_runs(ec, monkeypatch):
     real = ocr_jobs.job_manager.get_result
     monkeypatch.setattr(ocr_jobs.job_manager, "get_result", lambda rid: {**real(rid), "status": "running"})
     assert ec.get(f"/api/results/{run['id']}/export/txt").status_code == 409
+
+
+def test_export_layout_text_keeps_columns_and_spacing(ec):
+    run = ocr_run(ec)
+    resp = ec.get(f"/api/results/{run['id']}/export/layout")
+    assert resp.status_code == 200 and 'filename="page.layout.txt"' in resp.headers["content-disposition"]
+    rows = resp.text.splitlines()
+    header = next(r for r in rows if "Method" in r)
+    raw = next(r for r in rows if r.strip().startswith("Raw"))
+    assert "Method" in header and "ECE" in header and "Brier" in header
+    # Table columns line up across rows (within a character) and stay apart.
+    assert abs(header.index("ECE") - raw.index("0.081")) <= 1 and abs(header.index("Brier") - raw.index("0.142")) <= 1
+    assert raw.index("0.081") - raw.index("Raw") >= 5
+    # Prose keeps single spaces; the heading and the paragraph are separated by a blank row.
+    assert "Calibration Report" in rows[0]
+    assert rows[1] == "" and "This page compares raw and calibrated" in rows[2]

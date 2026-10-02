@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DocBlendAI</title>
+<link rel="stylesheet" href="/static/layout.css">
 <style>
   :root {
     color-scheme: light dark;  /* native scrollbars and dropdowns follow the theme */
@@ -164,6 +165,30 @@
   .viewer-body pre { margin: 0; padding: 16px 18px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
   .viewer-body .viewer-msg { padding: 24px 20px; color: var(--muted); font-size: 15px; }
   .viewer-body .viewer-msg a { color: var(--accent); font-weight: 600; }
+  .viewer-head .modes { display: flex; gap: 4px; flex-wrap: wrap; }
+  .viewer-head .modes button { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px;
+                               font-size: 13px; color: var(--accent); cursor: pointer; font-weight: 600; }
+  .viewer-head .modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .viewer-head .modes button:disabled { opacity: .45; cursor: not-allowed; }
+  .viewer-pager { display: flex; gap: 6px; align-items: center; justify-content: center; padding: 6px; font-size: 13px; color: var(--muted); }
+  .viewer-pager button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 2px 10px; cursor: pointer; color: var(--text); }
+  .viewer-body .lt-sheet { margin: 12px auto; }
+  .viewer-body .lt-flow { background: var(--panel); margin: 12px; padding: 12px 18px; border-radius: 8px; }
+
+  /* --- document state: processing, LLM refinement --- */
+  .doc-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; font-size: 12.5px; color: var(--muted); }
+  .doc-state progress { width: 120px; height: 6px; accent-color: var(--accent); }
+  .doc-state .err { color: var(--error); }
+  .llm-badge { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 8px; border: 1px solid currentColor; white-space: nowrap; }
+  .llm-badge.refined { color: var(--moderate); background: var(--moderate-bg); }
+  .llm-badge.reverted { color: var(--muted); }
+  .llm-badge.unavailable, .llm-badge.off { color: var(--unreadable); background: var(--unreadable-bg); }
+  .llm-badge.busy { color: var(--accent); background: var(--accent-soft); }
+  .doc-links { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 3px; }
+  .doc-links button, .doc-links a { background: none; border: 0; padding: 0; font-size: 12.5px; color: var(--accent); cursor: pointer;
+                                    text-decoration: underline; text-underline-offset: 2px; font-family: inherit; }
+  ul.docs li { align-items: flex-start; }
+  ul.docs li.processing .doc-name { color: var(--muted); }
   .source .scores { font-size: 13px; color: var(--muted); font-weight: 400; }
   .source blockquote { margin: 6px 0 0; padding: 10px 12px; background: var(--quote); border-radius: 7px;
                        font-size: 14px; line-height: 1.55; white-space: pre-wrap; max-height: 180px; overflow: auto; }
@@ -181,15 +206,15 @@
 <main>
   <section class="panel" aria-labelledby="docs-title">
     <h2 id="docs-title">Your documents</h2>
-    <p class="lead">Add the notes you want to ask about.</p>
+    <p class="lead">Add the notes you want to ask about. Each file is read (OCR for scans, TrOCR for handwriting), refined by an LLM, and listed in the <a href="/studio">Experience Center</a> too.</p>
     <form id="upload-form">
       <label class="drop" id="drop" for="file">
         <strong>Drag a file here, or click to choose</strong>
-        <span>PDF, Word, PowerPoint, text, or a photo/scan (JPG, PNG, TIFF, BMP, WEBP)</span>
+        <span>PDF, Word, PowerPoint, Excel, text, or a photo/scan (JPG, PNG, TIFF, BMP, WEBP)</span>
         <span class="chosen" id="chosen"></span>
       </label>
       <input type="file" id="file" class="visually-hidden" required
-             accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.txt">
+             accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,.docx,.pptx,.xlsx,.txt">
       <div class="upload-actions">
         <div>
           <label class="field-label" for="hint">Document type</label>
@@ -251,12 +276,18 @@
 <dialog class="viewer" id="viewer" aria-labelledby="viewer-title">
   <div class="viewer-head">
     <h2 id="viewer-title"></h2>
+    <span class="modes" role="group" aria-label="View">
+      <button type="button" id="mode-file" aria-pressed="true">File</button>
+      <button type="button" id="mode-layout" aria-pressed="false" title="The page rebuilt from its layout, with the LLM's corrections marked">Layout</button>
+      <button type="button" id="mode-original" aria-pressed="false" title="The layout with the text as originally recognised">Original text</button>
+    </span>
     <a id="viewer-open" target="_blank" rel="noopener">Open in new tab</a>
     <button type="button" class="btn" id="viewer-close">Close</button>
   </div>
   <div class="viewer-body" id="viewer-body"></div>
 </dialog>
 
+<script src="/static/layout.js"></script>
 <script>
 const WHY = {
   Certain: "Strong match in clearly readable text.",
@@ -265,7 +296,7 @@ const WHY = {
   Unreadable: "The relevant passage could not be read reliably (poor scan or handwriting).",
 };
 const FORMAT_LABEL = { typed: "Typed", scanned: "Scanned", handwritten: "Handwritten" };
-const TYPE_TAG = { pdf: "PDF", docx: "DOCX", pptx: "PPTX", txt: "TXT" };
+const TYPE_TAG = { pdf: "PDF", docx: "DOCX", pptx: "PPTX", xlsx: "XLSX", txt: "TXT" };
 
 // The server stores uploads as "<doc_id>_<original name>.<ext>"; recover the name from file_path.
 const docNames = {};
@@ -280,7 +311,7 @@ function pages(n) { return `${n} page${n === 1 ? "" : "s"}`; }
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) k === "class" ? (node.className = v) : node.setAttribute(k, v);
-  for (const c of children) node.append(c);
+  for (const c of children) if (c != null) node.append(c);
   return node;
 }
 
@@ -358,40 +389,121 @@ function setAll(on) {
 document.getElementById("pick-all").addEventListener("click", () => setAll(true));
 document.getElementById("pick-none").addEventListener("click", () => setAll(false));
 
+// The shared library (/documents/library): QA documents with their reading / LLM refinement state.
+const library = {};   // doc_id -> library item (run_id, refinement, ...)
+let docsPoll = null;
+const REFINED_LABEL = { refined: "Refined by LLM", reverted: "Original text", unavailable: "Not refined: Gemini unavailable", off: "Not refined" };
+
 async function loadDocs() {
+  clearTimeout(docsPoll);
   const list = document.getElementById("docs");
-  const docs = await api("/documents");
-  currentDocs = docs;
+  const items = (await api("/documents/library")).filter((d) => d.doc_id);
+  for (const d of items) library[d.doc_id] = d;
+  const ready = items.filter((d) => d.qa_ready);
+  currentDocs = ready;
   // Forget removed documents so the stored selection does not grow forever.
-  excluded = new Set([...excluded].filter((id) => docs.some((d) => d.doc_id === id)));
+  excluded = new Set([...excluded].filter((id) => ready.some((d) => d.doc_id === id)));
   saveExcluded();
   list.replaceChildren();
-  document.getElementById("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
+  document.getElementById("doc-count").textContent = items.length ? `${items.length} file${items.length === 1 ? "" : "s"}` : "";
   showSelection();
-  if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
-  for (const d of docs) {
-    const name = nameFromPath(d);
-    docNames[d.doc_id] = name;
-    const boxId = `use-${d.doc_id}`;
-    const box = el("input", { type: "checkbox", id: boxId, "aria-describedby": `meta-${d.doc_id}` });
-    box.checked = !excluded.has(d.doc_id);
-    box.addEventListener("change", () => {
-      box.checked ? excluded.delete(d.doc_id) : excluded.add(d.doc_id);
-      saveExcluded(); showSelection();
-    });
-    const view = el("button", { class: "remove view", type: "button", "aria-label": `View ${name}` }, "View");
-    view.addEventListener("click", () => openViewer(d.doc_id));
-    const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
-    remove.addEventListener("click", () => deleteDoc(d, remove));
-    list.append(el("li", { "data-id": d.doc_id },
-      box,
-      el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(name)),
-      el("span", { class: "doc-info" },
-        el("label", { class: "doc-name", for: boxId, title: name }, name),
-        el("span", { class: "doc-meta", id: `meta-${d.doc_id}` }, `${FORMAT_LABEL[d.format_type]} · ${pages(d.page_count)}`)),
-      view, remove));
+  if (!items.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); return; }
+  for (const d of items) list.append(docItem(d));
+  showSelection();
+  if (items.some((d) => d.status === "processing" || d.refine)) docsPoll = setTimeout(() => loadDocs().catch(() => {}), 2000);
+}
+
+function docItem(d) {
+  const name = d.name;
+  docNames[d.doc_id] = name;
+  const boxId = `use-${d.doc_id}`;
+  const box = el("input", { type: "checkbox", id: boxId, "aria-describedby": `meta-${d.doc_id}` });
+  box.checked = !excluded.has(d.doc_id);
+  box.disabled = !d.qa_ready;
+  box.addEventListener("change", () => {
+    box.checked ? excluded.delete(d.doc_id) : excluded.add(d.doc_id);
+    saveExcluded(); showSelection();
+  });
+  const info = el("span", { class: "doc-info" },
+    el("label", { class: "doc-name", for: boxId, title: name }, name),
+    el("span", { class: "doc-meta", id: `meta-${d.doc_id}` },
+      [FORMAT_LABEL[d.format_type] || "Reading…", d.page_count != null ? pages(d.page_count) : null].filter(Boolean).join(" · ")));
+  const stateRow = el("span", { class: "doc-state" });
+  if (d.status === "processing") {
+    const bar = el("progress", { max: "1", "aria-label": `Progress for ${name}` });
+    if (typeof d.progress === "number") bar.value = d.progress;
+    stateRow.append(bar, el("span", {}, d.message || "Reading…"));
+  } else if (d.status === "error") {
+    stateRow.append(el("span", { class: "err" }, d.error || "Reading failed."));
+  } else {
+    const ref = d.refinement || {};
+    const busy = d.refine && ["queued", "running"].includes(d.refine.status);
+    const badge = el("span", { class: `llm-badge ${busy ? "busy" : ref.status || "off"}`, title: ref.message || "" },
+      busy ? "Refining…" : REFINED_LABEL[ref.status] || "Not refined");
+    stateRow.append(badge);
+    if (busy && d.refine.message) stateRow.append(el("span", {}, d.refine.message));
+    if (ref.status === "unavailable" && !busy) stateRow.append(el("span", { title: ref.message }, ref.message.replace(/^Not refined: Gemini unavailable\.\s*/, "").slice(0, 120)));
+    if (d.qa && d.qa.status === "stale") stateRow.append(el("span", { class: "err" }, d.qa.message));
   }
-  showSelection();
+  const links = el("span", { class: "doc-links" });
+  const link = (text, fn, title) => { const b = el("button", { type: "button", title: title || "" }, text); b.addEventListener("click", fn); links.append(b); return b; };
+  const ref = d.refinement?.status;
+  if (d.status === "ready" && d.run_id) {
+    if (ref === "refined") {
+      link("Show original", () => openViewer(d.doc_id, null, "original"), "The text as recognised, before the LLM refinement");
+      link("Revert to original", () => docAction(d, "revert", `Answer questions about "${name}" from its original text instead of the LLM-refined text? You can switch back.`), "Questions will be answered from the original text");
+    }
+    if (ref === "reverted") link("Use refined text", () => docAction(d, "reapply"));
+    if (ref === "unavailable" || ref === "off") link("Retry", () => retryRefine(d), "Refine this document with Gemini again");
+    links.append(el("a", { href: `/studio?run=${encodeURIComponent(d.run_id)}`, title: "Page, layout, changes and versions" }, "View in Experience Center"));
+  } else if (d.status === "ready" && !d.run_id) {
+    link("Open in Experience Center", () => readForStudio(d), "Read this earlier upload with the Experience Center (layout, LLM refinement)");
+  }
+  const view = el("button", { class: "remove view", type: "button", "aria-label": `View ${name}` }, "View");
+  view.addEventListener("click", () => openViewer(d.doc_id));
+  const remove = el("button", { class: "remove", type: "button", "aria-label": `Remove ${name}` }, "Remove");
+  remove.addEventListener("click", () => deleteDoc(d, remove));
+  if (d.status === "processing") remove.disabled = true;
+  info.append(stateRow, links);
+  return el("li", { "data-id": d.doc_id, class: d.status === "processing" ? "processing" : "" },
+    box, el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(name)), info, view, remove);
+}
+
+async function docAction(d, action, question) {
+  if (question && !confirm(question)) return;
+  setStatus("upload-status", "Updating… (the document is re-embedded for questions)");
+  try {
+    await api(`/api/results/${encodeURIComponent(d.run_id)}/${action}`, { method: "POST" });
+    delete resultCache[d.run_id];
+    setStatus("upload-status", action === "revert" ? `${d.name}: questions now use the original text.` : `${d.name}: questions use the LLM-refined text again.`, "ok");
+  } catch (err) { setStatus("upload-status", err.message, "error"); }
+  loadDocs().catch(() => {});
+}
+
+async function retryRefine(d) {
+  try {
+    await api(`/api/results/${encodeURIComponent(d.run_id)}/refine`, { method: "POST" });
+    delete resultCache[d.run_id];
+    setStatus("upload-status", `Refining ${d.name} with Gemini…`);
+  } catch (err) { setStatus("upload-status", err.message, "error"); }
+  loadDocs().catch(() => {});
+}
+
+async function readForStudio(d) {
+  try {
+    await api(`/documents/${encodeURIComponent(d.doc_id)}/experience`, { method: "POST" });
+    setStatus("upload-status", `Reading ${d.name} for the Experience Center…`);
+  } catch (err) { setStatus("upload-status", err.message, "error"); }
+  loadDocs().catch(() => {});
+}
+
+// Experience Center results (lines, layout, LLM marks), fetched once per run.
+const resultCache = {};
+async function runResult(docId) {
+  const runId = library[docId]?.run_id;
+  if (!runId) return null;
+  if (!resultCache[runId]) resultCache[runId] = api(`/api/results/${encodeURIComponent(runId)}`).catch(() => null);
+  return resultCache[runId];
 }
 
 // --- document viewer ---
@@ -400,12 +512,25 @@ const IMAGE_EXTS = ["jpg", "jpeg", "png", "tif", "tiff", "bmp", "webp"];
 function downloadNote(text, url, name) {
   return el("p", { class: "viewer-msg" }, text, " ", el("a", { href: url, download: name }, `Download ${name}`));
 }
-function openViewer(docId, page) {
+const viewerState = { docId: null, page: null, mode: "file", layoutPage: 0 };
+function openViewer(docId, page, mode) {
+  Object.assign(viewerState, { docId, page: page || null, mode: mode || "file", layoutPage: page ? page - 1 : 0 });
+  const hasRun = !!library[docId]?.run_id;
+  document.getElementById("mode-layout").disabled = document.getElementById("mode-original").disabled = !hasRun;
+  if (!hasRun && viewerState.mode !== "file") viewerState.mode = "file";
+  renderViewer();
+  if (!viewer.open) viewer.showModal();
+}
+
+function renderViewer() {
+  const { docId, page, mode } = viewerState;
   const name = docLabel(docId), ext = name.split(".").pop().toLowerCase();
   const url = `/documents/${encodeURIComponent(docId)}/file`;
+  for (const m of ["file", "layout", "original"]) document.getElementById(`mode-${m}`).setAttribute("aria-pressed", String(m === mode));
   document.getElementById("viewer-title").textContent = page ? `${name}, page ${page}` : name;
   document.getElementById("viewer-open").href = ext === "pdf" && page ? `${url}#page=${page}` : url;
   viewerBody.replaceChildren();
+  if (mode !== "file") { renderViewerLayout(); return; }
   if (ext === "pdf") {
     // A new iframe each time, so a different #page is honoured even for the same file.
     viewerBody.append(el("iframe", { src: page ? `${url}#page=${page}` : url, title: name }));
@@ -420,9 +545,34 @@ function openViewer(docId, page) {
       .then((t) => { pre.textContent = t; })
       .catch(() => { pre.textContent = "Could not load this file."; });
   } else {
-    viewerBody.append(downloadNote("Word and PowerPoint files cannot be shown in the browser.", url, name));
+    viewerBody.append(downloadNote("Word, PowerPoint and Excel files cannot be shown in the browser: use Layout to see their structure.", url, name));
   }
-  if (!viewer.open) viewer.showModal();
+}
+
+async function renderViewerLayout() {
+  const { docId, mode } = viewerState;
+  viewerBody.append(el("p", { class: "viewer-msg" }, "Loading the layout…"));
+  const result = await runResult(docId);
+  if (viewerState.docId !== docId || viewerState.mode !== mode) return;  // changed meanwhile
+  viewerBody.replaceChildren();
+  if (!result) { viewerBody.append(el("p", { class: "viewer-msg" }, "No layout is available for this document.")); return; }
+  const n = result.pages?.length || 0;
+  viewerState.layoutPage = Math.min(Math.max(0, viewerState.layoutPage), Math.max(0, n - 1));
+  if (n > 1) {
+    const prev = el("button", { type: "button", "aria-label": "Previous page" }, "‹"), next = el("button", { type: "button", "aria-label": "Next page" }, "›");
+    prev.disabled = viewerState.layoutPage === 0;
+    next.disabled = viewerState.layoutPage >= n - 1;
+    prev.addEventListener("click", () => { viewerState.layoutPage--; renderViewer(); });
+    next.addEventListener("click", () => { viewerState.layoutPage++; renderViewer(); });
+    viewerBody.append(el("div", { class: "viewer-pager" }, prev, `Page ${viewerState.layoutPage + 1} of ${n}`, next));
+  }
+  if (mode === "original") viewerBody.append(el("p", { class: "viewer-msg" }, "The text as originally recognised, before the LLM refinement."));
+  const holder = el("div");
+  viewerBody.append(holder);
+  DocLayout.render(holder, result, viewerState.layoutPage, { mode: mode === "original" ? "original" : "refined" });
+}
+for (const m of ["file", "layout", "original"]) {
+  document.getElementById(`mode-${m}`).addEventListener("click", () => { viewerState.mode = m; renderViewer(); });
 }
 document.getElementById("viewer-close").addEventListener("click", () => viewer.close());
 viewer.addEventListener("click", (e) => { if (e.target === viewer) viewer.close(); });  // click on the backdrop
@@ -462,15 +612,16 @@ document.getElementById("upload-form").addEventListener("submit", async (e) => {
   form.append("file", file);
   const hint = document.getElementById("hint").value;
   if (hint) form.append("format_hint", hint);
+  form.append("background", "true");  // read in the background; the list shows the progress
   btn.disabled = true; btn.textContent = "Uploading…";
-  setStatus("upload-status", "Reading the file. Scanned and handwritten pages can take a minute.");
+  setStatus("upload-status", "Uploading…");
   try {
     const { body: doc, status: code } = await api("/upload", { method: "POST", body: form }, true);
     await loadDocs();
     if (code === 200) {
       setStatus("upload-status", `Already uploaded as ${docLabel(doc.doc_id)}, so it was not added again.`);
     } else {
-      setStatus("upload-status", `Added: ${FORMAT_LABEL[doc.format_type].toLowerCase()}, ${pages(doc.page_count)}.`, "ok");
+      setStatus("upload-status", "Reading the file: extracting, then refining with Gemini. You can ask questions as soon as it is ready.", "ok");
     }
     e.target.reset(); showChosen();
   } catch (err) {
@@ -484,10 +635,16 @@ function sourceView(s) {
   const pct = (v) => `${Math.round(v * 100)}%`;
   const open = el("button", { type: "button", title: "Open the document here" }, where);
   open.addEventListener("click", () => openViewer(s.doc_id, s.page));
+  const quote = el("blockquote", {}, s.text);
+  // Mark the LLM's corrections in the passage (hover a word for the original text).
+  runResult(s.doc_id).then((result) => {
+    const lines = (result?.pages || []).flatMap((p) => p.lines || []);
+    if (lines.some(DocLayout.isLlmLine)) quote.replaceChildren(DocLayout.highlightText(s.text, lines));
+  });
   return el("div", { class: "source" },
     el("div", { class: "where" }, open, " ",
       el("span", { class: "scores" }, `· match ${pct(s.similarity)} · readability ${pct(s.confidence)}`)),
-    el("blockquote", {}, s.text));
+    quote);
 }
 
 const question = document.getElementById("question");
@@ -555,7 +712,17 @@ document.getElementById("ask-form").addEventListener("submit", async (e) => {
   } finally { btn.disabled = false; btn.textContent = "Ask"; question.focus(); }
 });
 
-loadDocs().catch((err) => setStatus("upload-status", err.message, "error"));
+loadDocs().then(() => {
+  const only = new URLSearchParams(location.search).get("doc");
+  if (only && currentDocs.some((d) => d.doc_id === only)) {
+    excluded = new Set(currentDocs.map((d) => d.doc_id).filter((id) => id !== only));
+    saveExcluded();
+    for (const box of document.querySelectorAll("#docs input[type=checkbox]")) box.checked = !excluded.has(box.id.slice(4));
+    showSelection();
+    setStatus("ask-status", `Asking about ${docLabel(only)} only. Tick other documents to include them.`);
+    question.focus();
+  }
+}).catch((err) => setStatus("upload-status", err.message, "error"));
 </script>
 </body>
 </html>

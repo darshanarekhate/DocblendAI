@@ -46,3 +46,10 @@ def test_script_lists_every_bundled_sample(client):
     script = client.get("/static/studio.js").text
     for name in SAMPLES:
         assert name in script
+
+
+def test_shared_layout_assets_are_served_and_used_by_both_pages(client):
+    for path in ("/static/layout.js", "/static/layout.css"):
+        assert client.get(path).status_code == 200
+    assert "/static/layout.js" in client.get("/studio").text
+    assert "/static/layout.js" in client.get("/").text

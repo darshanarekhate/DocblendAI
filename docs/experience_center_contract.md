@@ -156,36 +156,46 @@ the applied steps in `"preprocess": ["deskew", ...]`.
 | GET | `/api/plugins` | `[{name, title, description, enabled, message}]` |
 | POST | `/api/results/{id}/plugins/{name}` | JSON options (`kie`: `{"fields": [...]}`; `translate`: `{"target_language": "French"}`) -> plugin output. 503 when the plugin is disabled (no API key), 400 bad options, 502 model error |
 
-## 7. Refine with LLM and versions (`app/routers/refine.py`, prefix `/api`)
+## 7. Shared documents, automatic LLM refinement, versions
 
-Every run keeps its original file (`source_file`, next to its page images) and a history of its text
-(`run_versions` table): the first extraction, every re-extraction, edit, accepted refinement and
-restore is a full copy of the result; a refinement is a proposal awaiting review.
+**One upload, one document for both pages.** `POST /upload` (QA page) and `POST /api/ocr` /
+`/api/parse` (Experience Center) store the file in `data/uploads/`, and one background run does:
+"Extracting page 2 of 5…" (document_extract.py: exact text for typed PDF / docx / pptx / xlsx /
+txt; PaddleOCR or PP-StructureV3 for scans and images; TrOCR reading Paddle's line boxes for
+handwriting) → "Refining with Gemini…" (every line, `refine` plugin, changes applied at once) →
+"Indexing for questions…" (chunks, calibrated confidence, content types, embeddings) → "Ready".
+The run is linked to the QA `Document` (`document_runs` table); deleting either deletes both.
+If Gemini is unavailable (no key, quota, error) the unrefined text is used, QA is not blocked, and
+`refinement.status` is `unavailable` with a message.
+
+`POST /upload` waits by default (201 Document, as before); `background=true` returns 202
+`{doc_id, run_id, status}`. Optional `pipeline` = structure (default, `INGEST_PIPELINE`) | ocr.
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/api/results/{id}/refine` | JSON (all optional) `{"preprocess": {...}, "pipeline": "ocr\|structure", "format_hint": "typed\|scanned\|handwritten"}` -> 202 `{job_id, run_id, status}`. 503 when `GEMINI_API_KEY` is missing, 409 while a refine of the same run is queued/running |
-| GET | `/api/results/{job_id}` | refine job: `{id, status, progress, message, error, pipeline: "refine", run_id, version_id}`; messages "Re-extracting page 2 of 5…" → "Refining with Gemini… (part 1 of 3)" → "Ready for review" |
-| GET | `/api/results/{run_id}/refinement` | newest proposal awaiting review: `{id, seq, kind: "refinement", status, label, data: {mode, model, max_change, counts, lines: [...]}}`; 404 if none |
-| POST | `/api/results/{run_id}/refinements/{version_id}/accept` | body `{"line_ids": [...]}` or none (= all pending) -> `{result, proposal}` |
-| POST | `/api/results/{run_id}/refinements/{version_id}/reject` | body `{"line_ids": [...]}` or none -> `{proposal}` |
-| POST | `/api/results/{run_id}/refinements/{version_id}/discard` | reject every pending line |
-| GET | `/api/results/{run_id}/versions` | `[{id, seq, kind: extraction\|edit\|restore\|refinement, status, label, created_at, counts?}]` oldest first |
+| GET | `/documents/library?q=` | both pages' documents: `{doc_id, run_id, name, format_type, page_count, status: processing\|ready\|error, progress, message, error, qa, refinement, refine, pipeline, engine, created_at, mean_confidence, qa_ready}` |
+| POST | `/documents/{doc_id}/experience` | read an earlier QA upload into a run (202 `{run_id}`) |
+| GET | `/api/results/{run_id}/changes` | what Gemini proposed per line (read-only): `{id, seq, kind: "refinement", data: {model, max_change, counts, lines: [...]}}`; 404 if not refined |
+| POST | `/api/results/{run_id}/revert` | use the original extraction (QA re-embedded) -> result |
+| POST | `/api/results/{run_id}/reapply` | use the latest LLM-refined text again (no Gemini call) -> result |
+| POST | `/api/results/{run_id}/refine` | retry the refinement of the original extraction: 202 `{job_id}`; poll `/api/results/{job_id}` (`pipeline: "refine"`). 503 without `GEMINI_API_KEY`, 409 while one runs |
+| GET | `/api/results/{run_id}/versions` | `[{id, seq, kind: extraction\|refinement\|edit\|restore, label, created_at, counts?}]` oldest first |
 | GET | `/api/results/{run_id}/versions/{version_id}` | the version with its `data` (a result object, or a proposal) |
-| GET | `/api/results/{run_id}/versions/{version_id}/compare` | `{version, changes: [{line_id, page, before, after, status, diff?}]}` (to the current text) |
+| GET | `/api/results/{run_id}/versions/{version_id}/compare` | `{version, changes: [{line_id, page, before, after, status, diff?}]}` to the current text |
 | POST | `/api/results/{run_id}/versions/{version_id}/restore` | make it current (recorded as a new version) -> result |
+| GET | `/api/results/{run_id}/export/layout` | layout-preserving monospace text (`<name>.layout.txt`) |
 
-Proposal line: `{line_id, page, original, refined, confidence, status: unchanged|corrected|inferred|rejected,
-change_ratio, diff: [{op: equal|replace|insert|delete, original, refined}], reason, decision: pending|accepted|rejected|conflict|n/a}`.
-`rejected` = the refinement changes more than `REFINE_MAX_CHANGE` (0.4) of the line's characters;
-the recognised text is kept, and accepting all flags the line (`needs_review: true`, `llm_flag`).
+Versions of a refined upload: v1 "Original extraction", v2 "Gemini's proposal (n changes)",
+v3 "Refined by Gemini (n corrections)" (current). Nothing is ever overwritten.
 
-Accepted lines: `text` = refined, `edited: true`, `source: "llm"` (automatic correction: `"llm-auto"`),
-`ocr_text` = what was recognised, `llm_diff` / `llm_status` for display. Lines also carry `source` for
-how they were read: `text` (typed), `paddleocr`, `trocr`, `tesseract`, or `human` after a manual edit.
-LLM text never raises reliability: in the QA index its confidence is capped at
-`reliability.LLM_TEXT_MAX_CONF` (just below Certain).
+Result additions: `doc_id`, `format_type` (typed | scanned | handwritten), `engine`, `notes`,
+`qa: {status: ready | stale, chunks, message, indexed_at}`,
+`refinement: {status: refined | unavailable | reverted | off | empty, message, model, corrected, counts, proposal_version, original_version}`,
+`active_job` (a running retry, or null).
 
-Results also carry `format_type` (typed | scanned | handwritten), `engine`, `notes`, `source_file`
-and `active_job` (the running refine job, or null). Page images of re-extraction n are served as
-`/api/results/{id}/pages/{i}/image?x=n`.
+Line additions: `source` = how the text was read (`text` typed, `paddleocr`, `trocr`, `tesseract`)
+or changed (`llm`, `human`); refined lines also carry `ocr_text` (as recognised), `llm_diff`
+(`[{op: equal|replace|insert|delete, original, refined}]`) and `llm_status` (corrected | inferred).
+A line whose refinement would change more than `REFINE_MAX_CHANGE` (0.4) of its characters keeps
+its text and gets `llm_flag` + `needs_review: true`. In the QA index, LLM-changed text counts at
+most `reliability.LLM_TEXT_MAX_CONF` (just below Certain): answers resting on it are at most Moderate.
