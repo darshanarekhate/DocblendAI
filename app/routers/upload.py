@@ -7,16 +7,28 @@ calibration -> content-type labeling -> embedding -> ChromaDB, and record a
 Document row.
 
 Uses from schemas.py: Document, FormatType.
+
+Two ways in:
+- POST /upload reads the file before replying (201 + the Document).
+- POST /upload/background (the web page) saves the file, replies within a second (202),
+  and reads it in the background; GET /uploads/pending lists files still being read
+  (or that failed), so the page can show "Reading..." and pick the document up when done.
+  Handwritten pages take ~25 s each on a laptop CPU; this keeps that off the upload.
 """
 
 import hashlib
 import logging
 import re
 import shutil
+import threading
+import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, Response, UploadFile, status,
+)
+from pydantic import BaseModel
 from pdfplumber.utils.exceptions import PdfminerException
 from sqlalchemy.orm import Session
 
@@ -42,28 +54,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["upload"])
 
 
-# Plain `def` (not async): PDF parsing, OCR, and HTR are blocking, so FastAPI runs this in its threadpool.
-@router.post("/upload", response_model=Document, status_code=status.HTTP_201_CREATED)
-def upload_document(
-    file: UploadFile = File(...),
-    format_hint: FormatType | None = Form(
-        None,
-        description=(
-            "Skip automatic detection and force this format (e.g. if detection guesses wrong). "
-            "Ignored for Word/PowerPoint/text files (always typed), and 'typed' is ignored for images."
-        ),
-    ),
-    db: Session = Depends(get_db),
-    response: Response = None,
-) -> Document:
-    """Ingest a file. 201 = new document; 200 = the same file was already uploaded (that Document is returned)."""
+FORMAT_HINT_HELP = (
+    "Skip automatic detection and force this format (e.g. if detection guesses wrong). "
+    "Ignored for Word/PowerPoint/text files (always typed), and 'typed' is ignored for images."
+)
+
+# Background uploads still being read (or failed): doc_id -> PendingUpload. In memory only:
+# a file whose reading was cut short by a server restart is simply not in the list afterwards.
+_pending: dict[str, "PendingUpload"] = {}
+_pending_lock = threading.Lock()
+FAILED_KEPT_SECONDS = 600  # a failed upload stays listed this long, so the page can report it
+
+
+class PendingUpload(BaseModel):
+    doc_id: str
+    name: str  # the original file name
+    status: str  # "reading", "failed", or "duplicate" (already uploaded: doc_id is that document)
+    detail: str | None = None  # why it failed
+    started: float = 0.0  # time.time() when the upload arrived
+
+
+def _save(file: UploadFile) -> tuple[str, Path]:
     filename = file.filename or ""
     if file_types.kind_of(filename) is None:
         raise HTTPException(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             f"Unsupported file type. Upload one of: {file_types.supported_extensions()}",
         )
-
     doc_id = uuid.uuid4().hex
     # Keep the original name in the stored path so the UI can show it (the Document entity has no name field).
     safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(filename).stem)[:80] or "document"
@@ -71,6 +88,19 @@ def upload_document(
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     with path.open("wb") as out:
         shutil.copyfileobj(file.file, out)
+    return doc_id, path
+
+
+# Plain `def` (not async): PDF parsing, OCR, and HTR are blocking, so FastAPI runs this in its threadpool.
+@router.post("/upload", response_model=Document, status_code=status.HTTP_201_CREATED)
+def upload_document(
+    file: UploadFile = File(...),
+    format_hint: FormatType | None = Form(None, description=FORMAT_HINT_HELP),
+    db: Session = Depends(get_db),
+    response: Response = None,
+) -> Document:
+    """Ingest a file. 201 = new document; 200 = the same file was already uploaded (that Document is returned)."""
+    doc_id, path = _save(file)
 
     existing = _same_file_already_uploaded(path, format_hint, db)
     if existing is not None:
@@ -88,6 +118,77 @@ def upload_document(
         raise
     logger.info("Uploaded %s as %s", file.filename, doc_id)
     return document
+
+
+@router.post("/upload/background", response_model=PendingUpload, status_code=status.HTTP_202_ACCEPTED)
+def upload_in_background(
+    request: Request,
+    background: BackgroundTasks,
+    file: UploadFile = File(...),
+    format_hint: FormatType | None = Form(None, description=FORMAT_HINT_HELP),
+    db: Session = Depends(get_db),
+    response: Response = None,
+) -> PendingUpload:
+    """Save the file and reply at once (202); it is read in the background (see GET /uploads/pending).
+
+    200 with status "duplicate" = the same file was already uploaded; doc_id is that document.
+    """
+    name = file.filename or ""
+    doc_id, path = _save(file)
+    existing = _same_file_already_uploaded(path, format_hint, db)
+    if existing is not None:
+        path.unlink(missing_ok=True)
+        response.status_code = status.HTTP_200_OK
+        return PendingUpload(doc_id=existing.doc_id, name=name, status="duplicate", started=time.time())
+
+    job = PendingUpload(doc_id=doc_id, name=name, status="reading", started=time.time())
+    with _pending_lock:
+        _pending[doc_id] = job
+    # The request's own session closes with the request; the background read opens its own
+    # (through the same dependency, so a test's database override applies too).
+    session_factory = request.app.dependency_overrides.get(get_db, get_db)
+    background.add_task(_ingest_in_background, doc_id, path, format_hint, session_factory, name)
+    logger.info("Saved %s as %s; reading it in the background", name, doc_id)
+    return job
+
+
+def _ingest_in_background(doc_id: str, path: Path, format_hint: FormatType | None, session_factory, name: str) -> None:
+    sessions = session_factory()
+    db = next(sessions)
+    try:
+        _ingest(doc_id, path, format_hint, db)
+        with _pending_lock:
+            _pending.pop(doc_id, None)
+        logger.info("Uploaded %s as %s", name, doc_id)
+    except Exception as e:  # noqa: BLE001 - reported to the page, never raised into the server
+        path.unlink(missing_ok=True)
+        detail = e.detail if isinstance(e, HTTPException) else "Reading the file failed; try again."
+        if not isinstance(e, HTTPException):
+            logger.exception("Background upload of %s failed", name)
+        with _pending_lock:
+            _pending[doc_id] = PendingUpload(doc_id=doc_id, name=name, status="failed", detail=detail, started=time.time())
+    finally:
+        sessions.close()
+
+
+@router.get("/uploads/pending", response_model=list[PendingUpload])
+def pending_uploads() -> list[PendingUpload]:
+    """Background uploads still being read, and ones that failed in the last few minutes."""
+    now = time.time()
+    with _pending_lock:
+        for doc_id, job in list(_pending.items()):
+            if job.status == "failed" and now - job.started > FAILED_KEPT_SECONDS:
+                del _pending[doc_id]
+        return sorted(_pending.values(), key=lambda job: job.started)
+
+
+@router.delete("/uploads/pending/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
+def dismiss_failed_upload(doc_id: str) -> None:
+    """Forget a failed background upload once the page has shown the error."""
+    with _pending_lock:
+        job = _pending.get(doc_id)
+        if job is not None and job.status == "failed":
+            del _pending[doc_id]
 
 
 @router.get("/documents", response_model=list[Document])

@@ -92,6 +92,9 @@
   .remove:hover { color: var(--error); }
   .view { flex: none; color: var(--accent); font-size: 13px; padding: 4px 6px; text-underline-offset: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+  ul.docs li.doc.reading { cursor: default; }
+  ul.docs li.doc.reading:hover { background: none; }
+  .reading .doc-meta { color: var(--accent); }
 
   /* --- document shown on the page, in the right-hand column in place of "Ask a question" --- */
   .viewer { grid-column: 2; grid-row: 1; }
@@ -351,15 +354,51 @@ function showScope() {
   }
 }
 
+// --- uploads still being read in the background ---
+// The upload itself takes a second; reading (OCR / handwriting) continues on the server and
+// the list checks back every few seconds until the file is ready.
+let watching = new Map();   // doc_id -> file name, for files this page saw being read
+let pollTimer = null;
+
+function readingRow(job) {
+  const seconds = Math.max(0, Math.round(Date.now() / 1000 - job.started));
+  return el("li", { class: "doc reading" },
+    el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(job.name)),
+    el("span", { class: "doc-info" },
+      el("span", { class: "doc-name", title: job.name }, job.name),
+      el("span", { class: "doc-meta" }, `Reading… ${seconds} s (handwritten pages take about 30 s each)`)));
+}
+
 async function loadDocs() {
   const list = document.getElementById("docs");
-  const docs = await api("/documents");
-  list.replaceChildren();
+  const [docs, jobs] = await Promise.all([api("/documents"), api("/uploads/pending")]);
+  const reading = jobs.filter((j) => j.status === "reading");
+  // Report files that finished (or failed) since the last check.
+  for (const [id, name] of [...watching]) {
+    const job = jobs.find((j) => j.doc_id === id);
+    if (job && job.status === "reading") continue;
+    watching.delete(id);
+    const doc = docs.find((d) => d.doc_id === id);
+    if (doc) setStatus("upload-status", `${name} is ready: ${FORMAT_LABEL[doc.format_type].toLowerCase()}, ${pages(doc.page_count)}.`, "ok");
+  }
+  for (const job of jobs.filter((j) => j.status === "failed")) {
+    setStatus("upload-status", `Could not read ${job.name}: ${job.detail}`, "error");
+    watching.delete(job.doc_id);
+    api(`/uploads/pending/${job.doc_id}`, { method: "DELETE" }).catch(() => {});
+  }
+  for (const job of reading) watching.set(job.doc_id, job.name);
+  clearTimeout(pollTimer);
+  if (reading.length) pollTimer = setTimeout(() => loadDocs().catch(() => {}), 2500);
+
+  list.replaceChildren(...reading.map(readingRow));
   document.getElementById("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
   allDocIds = docs.map((d) => d.doc_id);
   for (const id of [...unticked]) if (!allDocIds.includes(id)) unticked.delete(id);   // removed files
   saveTicks();
-  if (!docs.length) { list.append(el("li", { class: "empty" }, "Nothing uploaded yet.")); showScope(); return; }
+  if (!docs.length) {
+    if (!reading.length) list.append(el("li", { class: "empty" }, "Nothing uploaded yet."));
+    showScope(); return;
+  }
   for (const d of docs) {
     const name = nameFromPath(d);
     const viewUrl = `/documents/${d.doc_id}/view`;   // kept as a link target; clicks show the document on this page
@@ -429,16 +468,17 @@ document.getElementById("upload-form").addEventListener("submit", async (e) => {
   const hint = document.getElementById("hint").value;
   if (hint) form.append("format_hint", hint);
   btn.disabled = true; btn.textContent = "Uploading…";
-  setStatus("upload-status", "Reading the file. Scanned and handwritten pages can take a minute.");
   try {
-    const { body: doc, status: code } = await api("/upload", { method: "POST", body: form }, true);
-    await loadDocs();
+    // Replies as soon as the file is saved; it is read in the background (see loadDocs).
+    const { body: job, status: code } = await api("/upload/background", { method: "POST", body: form }, true);
     if (code === 200) {
-      setStatus("upload-status", `Already uploaded as ${docLabel(doc.doc_id)}, so it was not added again.`);
+      setStatus("upload-status", `Already uploaded as ${docLabel(job.doc_id)}, so it was not added again.`);
     } else {
-      setStatus("upload-status", `Added: ${FORMAT_LABEL[doc.format_type].toLowerCase()}, ${pages(doc.page_count)}.`, "ok");
+      watching.set(job.doc_id, job.name);
+      setStatus("upload-status", `Uploaded ${job.name}. It is being read now; you can keep asking questions meanwhile.`, "ok");
     }
     e.target.reset(); showChosen();
+    await loadDocs();
   } catch (err) {
     setStatus("upload-status", err.message, "error");
   } finally { btn.disabled = false; btn.textContent = "Upload"; }
