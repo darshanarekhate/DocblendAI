@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     # Whiten show-through from the back of the sheet and leftover rule traces before finding
     # lines (see line_segmentation.whiten_background).
     whiten_background: bool = True
+    # After HTR, Gemini corrects misread words page by page (see htr_correction.py); a line
+    # changing more than htr_correction_max_change of its characters keeps the recognized text.
+    htr_llm_correction: bool = True
+    htr_correction_max_change: float = 0.4
     # Temperature scaling of TrOCR token probabilities (Ayllon et al., ICDAR 2024: raw HTR
     # confidence is overconfident). 1.0 = off; fit with `python -m evaluation.fit_htr_temperature`.
     htr_temperature: float = 1.0

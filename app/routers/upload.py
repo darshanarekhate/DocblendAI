@@ -31,6 +31,7 @@ from app.modules import (
     embedder,
     file_types,
     format_detection,
+    htr_correction,
     htr_extractor,
     ocr_extractor,
     vector_store,
@@ -153,6 +154,8 @@ def _ingest(doc_id: str, path: Path, format_hint: FormatType | None, db: Session
     document = Document(doc_id=doc_id, file_path=str(path), format_type=format_type, page_count=pages)
     try:
         extracted = format_detection.extract(document, already_read)
+        if format_type is FormatType.HANDWRITTEN:
+            extracted = htr_correction.correct_pages(extracted)
     except file_types.UnreadableFileError:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, unreadable)
     except (ocr_extractor.OCRUnavailableError, htr_extractor.HTRUnavailableError) as e:

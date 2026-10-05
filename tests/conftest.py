@@ -121,6 +121,7 @@ def offline_engines(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "htr_segmenter", "projection")
     monkeypatch.setattr(settings, "htr_temperature", 1.0)
     monkeypatch.setattr(settings, "llm_fallback_model", "")
+    monkeypatch.setattr(settings, "htr_llm_correction", False)  # never call Gemini from tests
 
     def _refuse():
         pytest.fail("a test tried to load a real docTR model; fake it")

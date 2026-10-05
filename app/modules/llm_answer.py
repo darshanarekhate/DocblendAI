@@ -25,12 +25,17 @@ NOT_FOUND_ANSWER = "I couldn't find the answer to that in the uploaded documents
 NO_DOCUMENTS_ANSWER = "No documents have been uploaded yet, so there is nothing to answer from."
 
 SYSTEM_INSTRUCTION = (
-    "You answer questions about academic documents. Use only the numbered context "
-    "passages provided; never use outside knowledge. Be concise and precise. The user "
-    "cannot see the passages, so answer directly without mentioning them, the context, "
-    "or passage numbers. Passages marked as recognized text may contain OCR or "
-    "handwriting errors: do not guess at garbled words. If the "
-    f"passages do not contain the answer, reply with exactly {NOT_FOUND}."
+    "You answer questions about a student's own documents, using only the numbered context "
+    "passages provided. Answer with exactly what the passages say, in their own wording: "
+    "quote or closely follow their sentences, and include every point they give for the "
+    "question. Do not add anything that is not in the passages: no explanations, background, "
+    "examples, definitions or facts from your own knowledge, even when you know them, and do "
+    "not turn the passage into a general textbook answer. The user cannot see the passages, "
+    "so answer directly without mentioning them, the context, or passage numbers. Passages "
+    "marked as recognized text may contain OCR or handwriting errors: you may fix an obviously "
+    "misspelled word when the intended word is clear from the passage itself, but do not guess "
+    "at garbled or missing text. If the passages do not contain the answer, reply with "
+    f"exactly {NOT_FOUND}."
 )
 
 # Conversation memory for follow-up questions (chat): how much of the past goes into the prompt.
@@ -110,7 +115,7 @@ def _generate_with(model: str, prompt: str) -> str:
     """One Gemini model, with short retries on overload/rate limits. Raises the last APIError."""
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
-        temperature=0.2,
+        temperature=0.0,  # the same passages give the same answer; nothing creative
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     for attempt in range(MAX_ATTEMPTS):
