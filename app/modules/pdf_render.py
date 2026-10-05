@@ -22,6 +22,9 @@ PDF_POINTS_PER_INCH = 72
 # and shrink anything whose long side exceeds that at the requested DPI.
 # A 12-megapixel phone photo is ~4000 px; OCR at 300 DPI needs at most ~3500 px.
 PAGE_LONG_SIDE_INCHES = 11.69
+# An image whose long side is below this share of the target size is enlarged to the target.
+MIN_SHARE_OF_PAGE = 0.6
+MAX_ENLARGE = 4.0  # at most 4x: a small snippet (one cropped line) should not become a poster
 
 
 def denoise(image: Image.Image) -> Image.Image:
@@ -76,9 +79,13 @@ def _to_page(frame: Image.Image, dpi: int) -> Image.Image:
         page = Image.alpha_composite(white, page.convert("RGBA"))
     page = page.convert("L")
 
+    # Bring every page to about the requested DPI for an A4 page: shrink big phone photos, and
+    # enlarge small ones (web or chat images of ~500-1000 px), whose text lines are only ~12 px
+    # tall: line detection and TrOCR then read noise. A 465x660 note page went from CER 1.84 to
+    # 0.21 (and from 49 s to 14 s, as fewer junk fragments are read) once enlarged.
     max_side = int(dpi * PAGE_LONG_SIDE_INCHES)
-    if max(page.size) > max_side:
-        scale = max_side / max(page.size)
+    if max(page.size) > max_side or max(page.size) < MIN_SHARE_OF_PAGE * max_side:
+        scale = min(max_side / max(page.size), MAX_ENLARGE)
         page = page.resize((round(page.width * scale), round(page.height * scale)), Image.LANCZOS)
     return page
 
