@@ -64,7 +64,7 @@ def page_image(doc_id: str, page: int, db: Session = Depends(get_db)) -> Respons
     if not 1 <= page <= row.page_count:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Page {page} does not exist")
     try:
-        *_, image = render_pages(row.file_path, PREVIEW_DPI, max_pages=page)
+        *_, image = render_pages(row.file_path, PREVIEW_DPI, max_pages=page, first_page=page - 1)  # only that page
     except (OSError, UnreadableFileError, ValueError):
         raise HTTPException(status.HTTP_410_GONE, "The uploaded file is no longer readable")
     buf = io.BytesIO()

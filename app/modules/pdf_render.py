@@ -10,6 +10,7 @@ Responsibility: yield one grayscale PIL image per page:
 Uses from schemas.py: nothing; returns PIL images to ocr_extractor/htr_extractor.
 """
 
+import threading
 from collections.abc import Iterator
 
 import pypdfium2 as pdfium
@@ -18,6 +19,7 @@ from PIL import Image, ImageFilter, ImageOps, ImageSequence, UnidentifiedImageEr
 from app.modules.file_types import FileKind, UnreadableFileError, kind_of
 
 PDF_POINTS_PER_INCH = 72
+_PDFIUM_LOCK = threading.RLock()  # see render_pages
 # Images carry no reliable page size, so treat each as an A4 page (11.69 in tall)
 # and shrink anything whose long side exceeds that at the requested DPI.
 # A 12-megapixel phone photo is ~4000 px; OCR at 300 DPI needs at most ~3500 px.
@@ -47,17 +49,25 @@ def render_pages(file_path: str, dpi: int, max_pages: int | None = None, first_p
         yield from _image_pages(file_path, dpi, max_pages, first_page)
         return
 
-    pdf = pdfium.PdfDocument(file_path)
-    try:
+    # pdfium is not thread-safe: the web page loads several page images at once and background
+    # uploads render pages too, and overlapping calls fail with "Failed to load page" (HTTP 500,
+    # broken preview images). Every pdfium call runs under one lock; the lock is not held while
+    # the caller works on a yielded page (OCR/HTR), so other renders are not held up by that.
+    with _PDFIUM_LOCK:
+        pdf = pdfium.PdfDocument(file_path)
         count = len(pdf) if max_pages is None else min(len(pdf), max_pages)
+    try:
         for i in range(first_page, count):
-            page = pdf[i]
-            try:
-                yield page.render(scale=dpi / PDF_POINTS_PER_INCH).to_pil().convert("L")
-            finally:
-                page.close()
+            with _PDFIUM_LOCK:
+                page = pdf[i]
+                try:
+                    image = page.render(scale=dpi / PDF_POINTS_PER_INCH).to_pil().convert("L")
+                finally:
+                    page.close()
+            yield image
     finally:
-        pdf.close()
+        with _PDFIUM_LOCK:
+            pdf.close()
 
 
 def _open_image(file_path: str) -> Image.Image:

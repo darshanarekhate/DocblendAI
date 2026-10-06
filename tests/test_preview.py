@@ -79,3 +79,31 @@ def test_local_pages_opened_outside_the_server_may_call_the_api(client) -> None:
         resp = client.get("/health", headers={"Origin": origin})
         assert resp.headers.get("access-control-allow-origin") == origin
     assert "access-control-allow-origin" not in client.get("/health", headers={"Origin": "https://evil.example"}).headers
+
+
+def test_pages_render_correctly_when_requested_at_the_same_time(pdf_file) -> None:
+    """The page loads every page image at once; pdfium fails under overlapping calls without the lock."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.modules.pdf_render import render_pages
+
+    path = str(pdf_file([f"Page {n} text." for n in range(1, 9)]))
+
+    def page(n):
+        *_, image = render_pages(path, 110, max_pages=n, first_page=n - 1)
+        return image.size
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        sizes = list(pool.map(page, [n for n in range(1, 9) for _ in range(4)]))
+    assert len(sizes) == 32 and len(set(sizes)) == 1
+
+
+def test_preview_page_renders_only_that_page(client, pdf_file, monkeypatch) -> None:
+    from app.modules import pdf_render
+
+    doc_id = _upload(client, pdf_file(PAGES)).json()["doc_id"]
+    rendered = []
+    original = pdf_render.pdfium.PdfDocument.__getitem__
+    monkeypatch.setattr(pdf_render.pdfium.PdfDocument, "__getitem__", lambda self, i: rendered.append(i) or original(self, i))
+    assert client.get(f"/documents/{doc_id}/pages/3").status_code == 200
+    assert rendered == [2]
