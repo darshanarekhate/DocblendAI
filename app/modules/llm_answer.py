@@ -46,7 +46,38 @@ MAX_ATTEMPTS = 3
 
 
 class LLMError(RuntimeError):
-    """Answer generation failed: missing API key or a Gemini API error."""
+    """Answer generation failed: missing API key or a Gemini API error.
+
+    status is the HTTP status the API should answer with: 503 (no key), 429 (quota used
+    up), 502 (any other Gemini failure). The message is written for the user.
+    """
+
+    def __init__(self, message: str, status: int = 502) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+NO_KEY_MESSAGE = "Gemini is not configured: set GEMINI_API_KEY in .env (see .env.example) and restart the server."
+
+
+def describe_gemini_error(code: int | None, model: str, detail: object) -> tuple[str, int]:
+    """(message for the user, HTTP status) for a failed Gemini call.
+
+    Shared by answering, spelling, embeddings and the Experience Center plugins, so a used-up
+    free-tier quota reads the same everywhere instead of as a bare stack-trace string.
+    """
+    text = str(detail)
+    if code == 429 or "RESOURCE_EXHAUSTED" in text:
+        return (
+            f"Gemini's quota for {model} is used up for now (429). Free-tier limits reset daily: "
+            "try again later, or set LLM_MODEL / LLM_FALLBACK_MODEL in .env to another model.",
+            429,
+        )
+    if code in (500, 503) or "UNAVAILABLE" in text:
+        return f"Gemini ({model}) is overloaded or unavailable right now ({code}); try again in a minute.", 503
+    if code in (400, 401, 403) and ("API key" in text or "API_KEY" in text or "PERMISSION_DENIED" in text):
+        return f"Gemini rejected the API key ({code}): check GEMINI_API_KEY in .env.", 503
+    return f"Gemini call failed ({model}, {code}): {text}", 502
 
 
 @lru_cache
@@ -82,34 +113,37 @@ def build_prompt(question: str, chunks: list[RecognizedChunk], history: list[tup
     return prompt
 
 
-def _generate(prompt: str) -> str:
+def _generate(prompt: str, system_instruction: str = SYSTEM_INSTRUCTION) -> str:
     """Answer with settings.llm_model, or settings.llm_fallback_model if the first stays busy.
+
+    system_instruction defaults to the answering rules; spelling.py passes its own
+    to reuse the same models, retries, and fallback.
 
     Free-tier Gemini quotas are counted per model, so when the default model is
     out of quota (429) or overloaded (503) a second model can usually still answer.
     Other errors (a bad request, a missing key) are not retried on another model.
     """
     if not settings.gemini_api_key:
-        raise LLMError("GEMINI_API_KEY is not set (see .env.example)")
+        raise LLMError(NO_KEY_MESSAGE, 503)
 
     models = [settings.llm_model]
     if settings.llm_fallback_model and settings.llm_fallback_model != settings.llm_model:
         models.append(settings.llm_fallback_model)
     for i, model in enumerate(models):
         try:
-            return _generate_with(model, prompt)
+            return _generate_with(model, prompt, system_instruction)
         except errors.APIError as e:
             if e.code in RETRYABLE_CODES and i < len(models) - 1:
                 logger.warning("%s unavailable (%s); answering with %s instead", model, e.code, models[i + 1])
                 continue
-            raise LLMError(f"Gemini generation failed ({model}): {e}") from e
+            raise LLMError(*describe_gemini_error(e.code, model, e)) from e
     raise AssertionError("unreachable")
 
 
-def _generate_with(model: str, prompt: str) -> str:
+def _generate_with(model: str, prompt: str, system_instruction: str = SYSTEM_INSTRUCTION) -> str:
     """One Gemini model, with short retries on overload/rate limits. Raises the last APIError."""
     config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_INSTRUCTION,
+        system_instruction=system_instruction,
         temperature=0.2,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )

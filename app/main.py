@@ -16,15 +16,18 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db.database import init_db
-from app.routers import preview, query, upload
+from app.logging_config import configure_logging
+from app.routers import paddleocr, preview, query, refine, studio_tools, upload
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-# Uvicorn only configures its own loggers; this makes app.* INFO logs visible too.
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
+# Uvicorn only configures its own loggers; this makes app.* INFO logs visible too
+# (LOG_FORMAT=json switches to one JSON object per line).
+configure_logging(settings.log_format)
 logger = logging.getLogger(__name__)
 
 
@@ -34,17 +37,21 @@ def _warm_up_models() -> None:
     Loading TrOCR and docTR takes ~15 s and their first run is slower than later
     ones; doing both at startup, off the request path, keeps that out of uploads.
     A model that cannot load is simply loaded (and reported) on first use instead.
+    With the PaddleOCR engine (document_extract.py) only TrOCR is needed up front:
+    docTR finds handwritten lines and reads print only for the classic engine.
     """
     from PIL import Image
 
     from app.modules import htr_extractor, line_segmentation, ocr_extractor
+    from app.modules.document_extract import engine_mode
 
     blank_line, blank_page = Image.new("L", (384, 64), 255), Image.new("L", (850, 1100), 255)
     steps = [("HTR model", lambda: htr_extractor.recognize_lines([blank_line]))]
-    if settings.htr_segmenter == "doctr":
-        steps.append(("line detector", lambda: line_segmentation.detect_lines(blank_page)))
-    if ocr_extractor._engine() == "doctr":
-        steps.append(("docTR OCR", lambda: ocr_extractor.ocr_image(blank_page)))
+    if engine_mode() == "classic":
+        if settings.htr_segmenter == "doctr":
+            steps.append(("line detector", lambda: line_segmentation.detect_lines(blank_page)))
+        if ocr_extractor._engine() == "doctr":
+            steps.append(("docTR OCR", lambda: ocr_extractor.ocr_image(blank_page)))
     for name, step in steps:
         try:
             step()
@@ -84,6 +91,11 @@ app.add_middleware(
 app.include_router(upload.router)
 app.include_router(query.router)
 app.include_router(preview.router)
+app.include_router(paddleocr.router)
+app.include_router(studio_tools.router)
+app.include_router(refine.router)
+# Experience Center assets (studio.css/js, sample images) and the files both pages share (layout.js/css).
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/health", tags=["system"])
@@ -91,8 +103,17 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# no-cache: browsers re-check the pages on every visit, so UI changes show without Ctrl+F5.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
 @app.get("/", include_in_schema=False)
 def frontend() -> FileResponse:
     """Demo UI: upload documents, ask questions, see reliability labels and sources."""
-    # no-cache: browsers re-check the page on every visit, so UI changes show without Ctrl+F5.
-    return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+    return FileResponse(STATIC_DIR / "index.html", headers=NO_CACHE)
+
+
+@app.get("/studio", include_in_schema=False)
+def studio() -> FileResponse:
+    """Experience Center: OCR / document parsing with calibrated confidence, side by side."""
+    return FileResponse(STATIC_DIR / "studio.html", headers=NO_CACHE)
