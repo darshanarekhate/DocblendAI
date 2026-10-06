@@ -58,10 +58,89 @@ def chunk_pages_numbered(
     out: list[tuple[Location, RecognizedChunk]] = []
     for page_no, (page_text, raw_conf) in enumerate(pages, 1):
         line_starts = [m.start() for m in re.finditer(r"^[^\S\n]*\S", page_text, re.MULTILINE)]
-        for text, first, last in _split(page_text, chunk_size, overlap):
-            location = Location(page_no, bisect_right(line_starts, first), bisect_right(line_starts, last))
-            out.append((location, RecognizedChunk(chunk_id=f"{doc_id}:{len(out)}", text=text, raw_conf=raw_conf)))
+        for start, end, is_table in _segments(page_text):
+            piece_list = (
+                _split_table(page_text[start:end], chunk_size) if is_table
+                else _split(page_text[start:end], chunk_size, overlap)
+            )
+            for text, first, last in piece_list:
+                first, last = first + start, last + start
+                location = Location(page_no, bisect_right(line_starts, first), bisect_right(line_starts, last))
+                out.append((location, RecognizedChunk(chunk_id=f"{doc_id}:{len(out)}", text=text, raw_conf=raw_conf)))
     return out
+
+
+# --- tables get chunks of their own ---------------------------------------------------------
+# text_parser.py writes tables as "Table: A | B" followed by rows "A: x | B: y" (or plain
+# "x | y" rows). Mixed into a prose chunk, a table matches table questions ("customers in
+# February?") poorly, and a split table loses its header. So each table, with the short line
+# just before it (its caption, e.g. "Dataset contains:"), becomes its own chunk(s), split by
+# rows with the header line repeated at the top of each part.
+
+TABLE_HEADER = "Table: "
+CAPTION_MAX_CHARS = 120
+
+
+def _is_table_line(line: str) -> bool:
+    line = line.strip()
+    return line.startswith(TABLE_HEADER) or " | " in line
+
+
+def _segments(text: str) -> list[tuple[int, int, bool]]:
+    """Split a page into (start, end, is_table) character spans, in order."""
+    lines = [(m.start(), m.end(), m.group()) for m in re.finditer(r"[^\n]*\n?", text) if m.group()]
+    spans: list[tuple[int, int, bool]] = []
+    i = 0
+    while i < len(lines):
+        if not _is_table_line(lines[i][2]):
+            i += 1
+            continue
+        j = i
+        while j < len(lines) and (_is_table_line(lines[j][2]) or not lines[j][2].strip()):
+            j += 1
+        start = lines[i][0]
+        # Take the caption line along (the last non-empty line before the table), if short.
+        k = i - 1
+        while k >= 0 and not lines[k][2].strip():
+            k -= 1
+        if k >= 0 and len(lines[k][2].strip()) <= CAPTION_MAX_CHARS and not _is_table_line(lines[k][2]):
+            start = lines[k][0]
+        spans.append((start, lines[j - 1][1], True))
+        i = j
+    out, pos = [], 0
+    for start, end, _ in spans:
+        if text[pos:start].strip():
+            out.append((pos, start, False))
+        out.append((start, end, True))
+        pos = end
+    if text[pos:].strip():
+        out.append((pos, len(text), False))
+    return out
+
+
+def _split_table(text: str, chunk_size: int) -> list[tuple[str, int, int]]:
+    """Split a table span by rows; every part after the first starts with the header line again."""
+    rows = [(m.start(), m.group().rstrip()) for m in re.finditer(r"[^\n]+", text) if m.group().strip()]
+    header = next((row for _, row in rows if row.strip().startswith(TABLE_HEADER)), None)
+    pieces: list[tuple[str, int, int]] = []
+    current: list[tuple[int, str]] = []
+
+    def flush() -> None:
+        lines = [row for _, row in current]
+        if pieces and header and header not in lines:
+            lines.insert(0, header)
+        first, (last_start, last_row) = current[0][0], current[-1]
+        pieces.append(("\n".join(line.strip() for line in lines), first, last_start + len(last_row) - 1))
+
+    for start, row in rows:
+        size = sum(len(r) + 1 for _, r in current) + len(row) + (len(header) + 1 if pieces and header else 0)
+        if current and size > chunk_size:
+            flush()
+            current = []
+        current.append((start, row))
+    if current:
+        flush()
+    return pieces
 
 
 def _split(text: str, chunk_size: int, overlap: int) -> list[tuple[str, int, int]]:

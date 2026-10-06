@@ -185,8 +185,9 @@ def test_docx_keeps_paragraphs_and_tables_in_order(tmp_path) -> None:
     assert conf == 1.0
     lines = text.splitlines()
     assert lines[0] == "Unit 3: Normalization"
-    assert "Name  Marks" in lines and "Asha  91" in lines  # cells kept apart, like a table
-    assert lines.index("Asha  91") < lines.index("Third normal form removes transitive dependencies.")
+    # Header kept with every row, so "Asha's marks" can be read from the row alone.
+    assert "Table: Name | Marks" in lines and "Name: Asha | Marks: 91" in lines
+    assert lines.index("Name: Asha | Marks: 91") < lines.index("Third normal form removes transitive dependencies.")
 
 
 def test_docx_upload_is_typed_even_with_a_scanned_hint(client, tmp_path) -> None:
@@ -213,7 +214,7 @@ def test_pptx_is_one_page_per_slide_with_tables(tmp_path) -> None:
 
     assert len(pages) == 2
     assert "TCP/IP model" in pages[0][0] and "Four layers" in pages[0][0]
-    assert "HTTPS  443" in pages[1][0].splitlines()
+    assert "Protocol: HTTPS | Port: 443" in pages[1][0].splitlines()
 
 
 def test_pptx_upload(client, tmp_path) -> None:

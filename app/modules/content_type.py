@@ -34,6 +34,10 @@ def _is_table_row(line: str) -> bool:
     cells = [c for c in _CELL_SPLIT.split(line.strip()) if c]
     if len(cells) >= 3:
         return True
+    # The parser's table format (text_parser.py): "Table: A | B" header lines and
+    # "A: x | B: y" rows; a two-column table has only two cells per row.
+    if line.startswith("Table: ") or (len(cells) >= 2 and "|" in line and all(":" in c for c in cells)):
+        return True
     tokens = line.split()
     numbers = sum(bool(_NUMBER.match(t)) for t in tokens)
     if numbers >= 2 and numbers / len(tokens) >= 0.4:
