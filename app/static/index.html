@@ -92,9 +92,6 @@
   .remove:hover { color: var(--error); }
   .view { flex: none; color: var(--accent); font-size: 13px; padding: 4px 6px; text-underline-offset: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
-  ul.docs li.doc.reading { cursor: default; }
-  ul.docs li.doc.reading:hover { background: none; }
-  .reading .doc-meta { color: var(--accent); }
 
   /* --- document shown on the page, in the right-hand column in place of "Ask a question" --- */
   .viewer { grid-column: 2; grid-row: 1; }
@@ -360,15 +357,6 @@ function showScope() {
 let watching = new Map();   // doc_id -> file name, for files this page saw being read
 let pollTimer = null;
 
-function readingRow(job) {
-  const seconds = Math.max(0, Math.round(Date.now() / 1000 - job.started));
-  return el("li", { class: "doc reading" },
-    el("span", { class: "ftype", "aria-hidden": "true" }, typeTag(job.name)),
-    el("span", { class: "doc-info" },
-      el("span", { class: "doc-name", title: job.name }, job.name),
-      el("span", { class: "doc-meta" }, `Reading… ${seconds} s (handwritten pages take about 30 s each)`)));
-}
-
 async function loadDocs() {
   const list = document.getElementById("docs");
   const [docs, jobs] = await Promise.all([api("/documents"), api("/uploads/pending")]);
@@ -390,13 +378,13 @@ async function loadDocs() {
   clearTimeout(pollTimer);
   if (reading.length) pollTimer = setTimeout(() => loadDocs().catch(() => {}), 2500);
 
-  list.replaceChildren(...reading.map(readingRow));
+  list.replaceChildren();   // a file being read is not listed; it appears once it is ready
   document.getElementById("doc-count").textContent = docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"}` : "";
   allDocIds = docs.map((d) => d.doc_id);
   for (const id of [...unticked]) if (!allDocIds.includes(id)) unticked.delete(id);   // removed files
   saveTicks();
   if (!docs.length) {
-    if (!reading.length) list.append(el("li", { class: "empty" }, "Nothing uploaded yet."));
+    list.append(el("li", { class: "empty" }, reading.length ? "Your file is being read…" : "Nothing uploaded yet."));
     showScope(); return;
   }
   for (const d of docs) {
