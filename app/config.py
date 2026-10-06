@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # Printed-text OCR engine: "tesseract", "doctr" (mindee/doctr, no system install), or "auto"
     # (Tesseract when installed, otherwise docTR).
     ocr_engine: str = "auto"
+    # Read ruled tables in scanned pages and images cell by cell (table_ocr.py), so each value
+    # stays with its row and column; off = whole-page OCR only.
+    ocr_tables: bool = True
     calibration_file: Path = DATA_DIR / "calibration.json"
     # Load the OCR/HTR models in the background when the server starts, so the first
     # scanned or handwritten upload does not wait ~15 s for them.

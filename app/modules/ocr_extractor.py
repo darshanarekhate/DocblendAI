@@ -21,10 +21,11 @@ from functools import lru_cache
 from pathlib import Path
 
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageOps
 
 from app.config import settings
 from app.modules.file_types import FileKind, kind_of
+from app.modules import table_ocr
 from app.modules.pdf_render import denoise, render_pages
 
 logger = logging.getLogger(__name__)
@@ -103,11 +104,38 @@ def _doctr_ocr(image: Image.Image) -> tuple[str, float]:
     return "\n\n".join(blocks), weighted / chars
 
 
-def _tesseract_ocr(image: Image.Image) -> tuple[str, float]:
+def ocr_cell(image: Image.Image) -> tuple[str, float]:
+    """OCR one table cell (table_ocr.py): a small crop that may hold a single short word.
+
+    Tesseract's default page mode looks for text blocks and often returns nothing for a
+    lone "12" or "Id"; mode 6 (one uniform block) reads it. The crop gets a white margin
+    and small crops are enlarged, as Tesseract misses text touching the image edge.
+    Contrast is stretched first: header cells are often shaded grey (dark text on grey
+    read as "(Name" at 0.38 confidence before, "Name" at 0.96 after).
+    """
+    if _engine() == "doctr":
+        return _doctr_ocr(image)
+    gray = ImageOps.autocontrast(image.convert("L"), cutoff=2)
+    if gray.height < 60:
+        scale = 60 / max(1, gray.height)
+        gray = gray.resize((max(1, round(gray.width * scale)), 60), Image.LANCZOS)
+    padded = Image.new("L", (gray.width + 40, gray.height + 40), 255)
+    padded.paste(gray, (20, 20))
+    # Mode 6 (a block) first; a cell that comes back empty is retried as one line (7), then as a
+    # single character (10): a lone "8" in a wide cell is otherwise missed.
+    for config, min_conf in (("--psm 6", 0.0), ("--psm 7", 0.0), ("--psm 10", 0.6)):
+        text, conf = _tesseract_ocr(padded, config=config)
+        if text.strip() and conf >= min_conf:  # a single-character guess only when confident
+            return text, conf
+    return "", 0.0
+
+
+def _tesseract_ocr(image: Image.Image, config: str = "") -> tuple[str, float]:
     pytesseract.pytesseract.tesseract_cmd = _tesseract_cmd(settings.tesseract_cmd)
     try:
         data = pytesseract.image_to_data(
-            denoise(image), output_type=pytesseract.Output.DICT, timeout=OCR_TIMEOUT_SECONDS
+            denoise(image), output_type=pytesseract.Output.DICT, timeout=OCR_TIMEOUT_SECONDS,
+            **({"config": config} if config else {}),  # page OCR calls Tesseract exactly as before
         )
     except RuntimeError as e:  # pytesseract raises RuntimeError("Tesseract process timeout")
         if "timeout" not in str(e).lower():
@@ -194,4 +222,17 @@ def ocr_file(file_path: str, max_pages: int | None = None, first_page: int = 0) 
     # collection (Windows cannot delete a file that is still open).
     with closing(render_pages(file_path, settings.ocr_dpi, max_pages, first_page)) as pages:
         orient = orient_for(file_path)
-        return [ocr_image(orient(img)) for img in pages]
+        return [_read_page(orient(img)) for img in pages]
+
+
+def _read_page(page: Image.Image) -> tuple[str, float]:
+    """A page with ruled tables is read table cell by table cell (table_ocr.py); others as a whole."""
+    if settings.ocr_tables:
+        try:
+            with_tables = table_ocr.read_page(denoise(page))
+        except Exception as e:  # noqa: BLE001 - table reading must never lose the page
+            logger.warning("Table reading failed; reading the page as a whole: %s", e)
+            with_tables = None
+        if with_tables is not None:
+            return with_tables
+    return ocr_image(page)

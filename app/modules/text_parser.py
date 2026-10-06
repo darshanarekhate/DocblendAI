@@ -92,6 +92,16 @@ def _clean(text) -> str:
     return " ".join((text or "").split())  # one line: wrapped cell text joined with spaces
 
 
+HEADER_MAX_WORDS = 5  # a header cell names a column; a longer cell means the row is data
+
+
+def _usable_header(cells: list[str]) -> bool:
+    return (
+        len(cells) > 1 and all(cells) and len(set(cells)) == len(cells)
+        and all(len(c.split()) <= HEADER_MAX_WORDS for c in cells)
+    )
+
+
 def _grid_lines(grid: list[list]) -> list[str]:
     """Write a table (rows of cell texts; None or "" = empty/merged) as text lines.
 
@@ -103,10 +113,16 @@ def _grid_lines(grid: list[list]) -> list[str]:
     rows = [row for row in rows if any(row)]
     if not rows:
         return []
-    header = rows[0]
-    if len(rows) > 1 and len(header) > 1 and all(header) and len(set(header)) == len(header):
+    header, body = rows[0], rows[1:]
+    if not _usable_header(header) and len(rows) > 2:
+        # A two-row header, e.g. "Criteria | Languages (merged over 3 columns)" above
+        # "| C++ | C# | Java": the lower row's names, the upper row's where the lower is empty.
+        combined = [low or high for high, low in zip(rows[0], rows[1])]
+        if _usable_header(combined):
+            header, body = combined, rows[2:]
+    if body and _usable_header(header):
         lines = [TABLE_PREFIX + CELL_SEPARATOR.join(header)]
-        for row in rows[1:]:
+        for row in body:
             pairs = [f"{name}: {value}" for name, value in zip(header, row) if value]
             if pairs:
                 lines.append(CELL_SEPARATOR.join(pairs))
