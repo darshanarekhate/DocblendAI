@@ -26,6 +26,25 @@ project context.
 
 The TrOCR handwriting model (~250 MB) downloads automatically on the first handwritten upload.
 
+## Running with Docker (any laptop)
+
+Needs only [Docker Desktop](https://www.docker.com/products/docker-desktop/); Python, Tesseract
+and the TrOCR/docTR models are all inside the image.
+
+```bash
+git clone https://github.com/darshanarekhate/DocblendAI.git
+cd DocblendAI
+copy .env.example .env        # then put your key after GEMINI_API_KEY=  (macOS/Linux: cp)
+docker compose up --build
+```
+
+Open http://localhost:8000/. The first build takes 10-20 minutes (it downloads ~2 GB); later
+starts take seconds. Uploaded documents are kept in the `docblend-data` volume between runs.
+
+- Stop: `Ctrl+C`, or `docker compose down`
+- Start again: `docker compose up`
+- Delete all uploaded documents: `docker compose down -v`
+
 ## Running
 
 ```bash

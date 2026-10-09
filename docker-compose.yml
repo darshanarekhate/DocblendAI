@@ -1,0 +1,17 @@
+services:
+  docblendai:
+    build: .
+    image: docblendai
+    container_name: docblendai
+    ports:
+      - "8000:8000"
+    # GEMINI_API_KEY and any other settings from .env (copy .env.example to .env first)
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - docblend-data:/app/data   # uploads, SQLite database, ChromaDB
+    restart: unless-stopped
+
+volumes:
+  docblend-data:

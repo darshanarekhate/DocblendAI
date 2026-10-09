@@ -1,0 +1,16 @@
+.git
+.gitignore
+.claude
+CLAUDE.md
+venv
+.venv
+.env
+**/__pycache__
+**/*.pyc
+.pytest_cache
+data/*.db
+data/uploads
+data/chroma_db
+data/paddle_runs
+evaluation/dataset
+evaluation/results/work
